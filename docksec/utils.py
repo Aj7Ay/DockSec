@@ -44,11 +44,9 @@ except ImportError:
             "Install with: pip install pydantic langchain-core"
         )
 from typing import List, Optional
-import time
 from tqdm import tqdm
 from colorama import Fore, Style, init
 from rich.console import Console
-from rich.table import Table
 from tenacity import (
     retry,
     stop_after_attempt,

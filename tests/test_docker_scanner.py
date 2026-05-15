@@ -109,7 +109,7 @@ class TestDockerSecurityScanner(unittest.TestCase):
         # Mock FileNotFoundError for missing tool
         mock_subprocess.side_effect = FileNotFoundError()
         
-        dockerfile = self.create_test_dockerfile()
+        self.create_test_dockerfile()
         
         with patch('docksec.docker_scanner.get_llm'):
             scanner = DockerSecurityScanner.__new__(DockerSecurityScanner)

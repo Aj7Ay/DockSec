@@ -9,8 +9,7 @@ from fpdf import FPDF
 import sys
 import re
 from pathlib import Path
-from docksec.config import RESULTS_DIR
-from docksec.config import docker_score_prompt
+from docksec.config import RESULTS_DIR, docker_score_prompt
 from docksec.utils import ScoreResponse, get_llm, print_section, get_custom_logger
 
 # Initialize logger
@@ -158,7 +157,7 @@ class DockerSecurityScanner:
         
         # Verify Docker image exists (using validated image_name)
         try:
-            result = subprocess.run(
+            subprocess.run(
                 ['docker', 'image', 'inspect', self.image_name],
                 capture_output=True,
                 check=True,
@@ -1051,8 +1050,6 @@ class DockerSecurityScanner:
         # Sanitize image name for filename
         safe_image_name = re.sub(r'[:/.\-]', '_', self.image_name)
         output_file = os.path.join(self.RESULTS_DIR, f"{safe_image_name}_security_report.html")
-        # template_path = os.path.join(os.path.dirname(__file__), 'templates', 'report_template.html')
-        template_path = os.path.join(os.path.dirname(__file__), 'report_template.html')
 
         try:
             from docksec.config import html_template

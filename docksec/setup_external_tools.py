@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 import subprocess
-import sys
 import os
 import platform
 import shutil
 from pathlib import Path
 import urllib.request
 import stat
-import zipfile
 import json
 
 def get_os_type():
@@ -117,7 +115,6 @@ def install_trivy():
             # Download URL for Windows
             url = f"https://github.com/aquasecurity/trivy/releases/download/v{version}/trivy_{version}_windows-64bit.zip"
             zip_path = install_dir / "trivy.zip"
-            exe_path = install_dir / "trivy.exe"
 
             # Download and extract
             print(f"Downloading Trivy v{version}...")
@@ -131,8 +128,7 @@ def install_trivy():
             zip_path.unlink()
 
             # Add to PATH if not already there
-            user_path = os.environ.get("PATH", "")
-            if str(install_dir) not in user_path:
+            if str(install_dir) not in os.environ.get("PATH", ""):
                 # Using setx to permanently add to PATH
                 subprocess.run(["setx", "PATH", f"{user_path};{install_dir}"], shell=True)
                 print("Added Trivy to PATH. Please restart your terminal for the changes to take effect.")
