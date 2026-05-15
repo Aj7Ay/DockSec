@@ -32,7 +32,7 @@ setup(
         "pandas==3.0.2",
         "tqdm==4.67.1",
         "colorama==0.4.6",
-        "rich==13.9.4",
+        "rich==15.0.0",
         "fpdf2==2.8.1",
         "tenacity==9.0.0",
         "setuptools>=65.0.0",
