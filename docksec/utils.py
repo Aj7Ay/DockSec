@@ -30,15 +30,15 @@ try:
     OLLAMA_AVAILABLE = True
 except ImportError:
     OLLAMA_AVAILABLE = False
-from config import (
+from docksec.config import (
     BASE_DIR,
     OPENAI_API_KEY
 )
 try:
-    from langchain_core.pydantic_v1 import BaseModel, Field
+    from pydantic import BaseModel, Field
 except ImportError:
     try:
-        from pydantic import BaseModel, Field
+        from langchain_core.pydantic_v1 import BaseModel, Field
     except ImportError:
         raise ImportError(
             "Either 'pydantic' or 'langchain-core' must be installed. "
@@ -153,7 +153,7 @@ def get_llm() -> Union[ChatOpenAI, 'ChatAnthropic', 'ChatGoogleGenerativeAI', 'C
         - Uses exponential backoff: 2s, 4s, 8s
         - Handles rate limiting automatically
     """
-    from config_manager import get_config
+    from docksec.config_manager import get_config
     
     try:
         config = get_config()

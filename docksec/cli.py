@@ -112,7 +112,7 @@ def main() -> None:
         print("\n=== Running AI-based Dockerfile analysis ===")
         try:
             # Import required modules from main.py
-            from utils import (
+            from docksec.utils import (
                 get_custom_logger,
                 load_docker_file,
                 get_llm,
@@ -120,7 +120,7 @@ def main() -> None:
                 AnalyzesResponse,
                 ScoreResponse
             )
-            from config import docker_agent_prompt, docker_score_prompt
+            from docksec.config import docker_agent_prompt, docker_score_prompt
             from pathlib import Path
             
             # Set up the same components as main.py
@@ -150,11 +150,11 @@ def main() -> None:
         scan_type = "image-only" if args.image_only else "full"
         print(f"\n=== Running {scan_type} security scanner ===")
         try:
-            from docker_scanner import DockerSecurityScanner
+            from docksec.docker_scanner import DockerSecurityScanner
             
             # Initialize the scanner
             dockerfile_path = args.dockerfile if run_dockerfile_analysis else None
-            scanner = DockerSecurityScanner(dockerfile_path, args.image)
+            scanner = DockerSecurityScanner(dockerfile_path, args.image, scan_only=args.scan_only or args.image_only)
             
             # Run appropriate scan based on mode
             if args.image_only:
@@ -166,7 +166,7 @@ def main() -> None:
                 results = scanner.run_full_scan("CRITICAL,HIGH")
             
             # Calculate security score
-            score = scanner.get_security_score(results)
+            scanner.analysis_score = scanner.get_security_score(results)
             
             # Generate all reports
             scanner.generate_all_reports(results)
