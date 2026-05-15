@@ -19,7 +19,6 @@ import logging
 from typing import Dict, List, Optional
 from datetime import datetime
 from fpdf import FPDF
-from pathlib import Path
 
 from docksec.config import RESULTS_DIR, html_template
 from docksec.utils import get_custom_logger

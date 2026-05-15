@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 import subprocess
-import sys
 import os
 import platform
 import shutil
+import zipfile
 from pathlib import Path
 import urllib.request
 import stat
-import zipfile
 import json
 
 def get_os_type():
@@ -117,7 +116,6 @@ def install_trivy():
             # Download URL for Windows
             url = f"https://github.com/aquasecurity/trivy/releases/download/v{version}/trivy_{version}_windows-64bit.zip"
             zip_path = install_dir / "trivy.zip"
-            exe_path = install_dir / "trivy.exe"
 
             # Download and extract
             print(f"Downloading Trivy v{version}...")

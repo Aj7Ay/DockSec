@@ -3,7 +3,6 @@
 import sys
 import os
 import argparse
-from typing import Optional
 
 def get_version() -> str:
     """Return the installed package version.
@@ -23,7 +22,7 @@ def get_version() -> str:
         import re
         setup_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'setup.py')
         with open(setup_path, 'r') as f:
-            match = re.search(r'version="([^"]+)"', f.read())
+            match = re.search(r'version\s*=\s*["\']([^"\']+)["\']', f.read())
             if match:
                 return match.group(1)
     except Exception:  # setup.py missing or unreadable; fall through to unknown
@@ -81,8 +80,7 @@ def main() -> None:
     
     # Validate image requirement for image-based operations
     if (args.image_only or args.scan_only) and not args.image:
-        operation = "image-only scanning" if args.image_only else "scan-only mode"
-        print(f"Error: Image name is required for {operation}. Use -i/--image to specify the Docker image.")
+        print(f"Error: Image name is required for {'image-only scanning' if args.image_only else 'scan-only mode'}. Use -i/--image to specify the Docker image.")
         print("Example: docksec --image-only -i myapp:latest")
         sys.exit(1)
     
@@ -124,7 +122,6 @@ def main() -> None:
             from pathlib import Path
             
             # Set up the same components as main.py
-            logger = get_custom_logger(name='docksec_ai')
             llm = get_llm()
             Report_llm = llm.with_structured_output(AnalyzesResponse, method="json_mode")
             analyser_chain = docker_agent_prompt | Report_llm

@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="docksec",
-    version="2026.5.6",
+    version="2026.5.15",
     description="AI-Powered Docker Security Analyzer",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -25,12 +25,12 @@ setup(
     python_requires=">=3.12",
     install_requires=[
         "pydantic==2.13.4",
-        "langchain-core==0.3.26",
-        "langchain==0.3.13",
-        "langchain-openai==0.2.10",
-        "langchain-anthropic==0.3.0",
-        "langchain-google-genai==2.0.5",
-        "langchain-ollama==0.2.0",
+        "langchain-core==1.3.3",
+        "langchain==1.2.18",
+        "langchain-openai==1.2.1",
+        "langchain-anthropic==1.4.3",
+        "langchain-google-genai==4.2.2",
+        "langchain-ollama==1.1.0",
         "python-dotenv==1.2.2",
         "pandas==3.0.2",
         "tqdm==4.67.3",
