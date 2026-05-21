@@ -3,6 +3,7 @@ import unittest
 import os
 import tempfile
 from unittest.mock import patch, Mock
+from io import StringIO
 
 # Import after mocking external dependencies
 import sys
@@ -82,6 +83,141 @@ class TestUtils(unittest.TestCase):
 
         with self.assertRaises(EnvironmentError):
             get_llm()
+    
+    def test_print_section_with_items(self):
+        """Test print_section with list of items."""
+        from docksec.utils import print_section
+        
+        items = ["Issue 1", "Issue 2", "Issue 3", "Issue 4", "Issue 5", "Issue 6"]
+        
+        # Capture output
+        with patch('docksec.utils.console') as mock_console:
+            print_section("Test Section", items, "red", max_items=3)
+            
+            # Should have been called multiple times
+            self.assertGreater(mock_console.print.call_count, 0)
+    
+    def test_print_section_empty_items(self):
+        """Test print_section with empty items list."""
+        from docksec.utils import print_section
+        
+        with patch('docksec.utils.console') as mock_console:
+            print_section("Empty Section", [], "blue")
+            
+            # Should indicate no items found
+            mock_console.print.assert_called()
+    
+    def test_print_section_max_items_limit(self):
+        """Test print_section respects max_items limit."""
+        from docksec.utils import print_section
+        
+        items = [f"Item {i}" for i in range(20)]
+        
+        with patch('docksec.utils.console') as mock_console:
+            print_section("Many Items", items, "green", max_items=5)
+            
+            # Should mention remaining items
+            calls_str = str(mock_console.print.call_args_list)
+            self.assertIn("and", calls_str.lower())
+    
+    def test_print_section_truncates_long_items(self):
+        """Test print_section truncates long items."""
+        from docksec.utils import print_section
+        
+        long_items = ["A" * 100, "B" * 100]
+        
+        with patch('docksec.utils.console') as mock_console:
+            print_section("Long Items", long_items, "yellow")
+            
+            # Should be called
+            mock_console.print.assert_called()
+    
+    def test_analyze_security_compact_mode(self):
+        """Test analyze_security in compact mode."""
+        from docksec.utils import analyze_security, AnalyzesResponse
+        
+        response = AnalyzesResponse(
+            vulnerabilities=["Vuln 1", "Vuln 2"],
+            best_practices=["Practice 1", "Practice 2", "Practice 3"],
+            SecurityRisks=["Risk 1"],
+            ExposedCredentials=[],
+            remediation=["Fix 1", "Fix 2"]
+        )
+        
+        with patch('docksec.utils.console') as mock_console:
+            with patch('docksec.utils.print_section') as mock_print_section:
+                analyze_security(response, compact=True)
+                
+                # Should call print_section multiple times
+                self.assertGreater(mock_print_section.call_count, 0)
+                
+                # Verify it's called with max_items=3 for compact mode
+                calls = mock_print_section.call_args_list
+                for call in calls:
+                    if 'max_items' in call.kwargs:
+                        self.assertEqual(call.kwargs['max_items'], 3)
+    
+    def test_analyze_security_full_mode(self):
+        """Test analyze_security in full mode."""
+        from docksec.utils import analyze_security, AnalyzesResponse
+        
+        response = AnalyzesResponse(
+            vulnerabilities=["Vuln 1", "Vuln 2"],
+            best_practices=["Practice 1"],
+            SecurityRisks=["Risk 1"],
+            ExposedCredentials=[],
+            remediation=["Fix 1"]
+        )
+        
+        with patch('docksec.utils.console') as mock_console:
+            with patch('docksec.utils.print_section') as mock_print_section:
+                analyze_security(response, compact=False)
+                
+                # Should call print_section
+                self.assertGreater(mock_print_section.call_count, 0)
+                
+                # In full mode, max_items should be 10
+                calls = mock_print_section.call_args_list
+                for call in calls:
+                    if 'max_items' in call.kwargs:
+                        self.assertEqual(call.kwargs['max_items'], 10)
+    
+    def test_analyze_security_with_all_fields(self):
+        """Test analyze_security handles all response fields."""
+        from docksec.utils import analyze_security, AnalyzesResponse
+        
+        response = AnalyzesResponse(
+            vulnerabilities=["CVE-2023-0001"],
+            best_practices=["Use secrets management"],
+            SecurityRisks=["Privilege escalation"],
+            ExposedCredentials=["AWS_KEY in ENV"],
+            remediation=["Rotate credentials"]
+        )
+        
+        with patch('docksec.utils.console') as mock_console:
+            with patch('docksec.utils.print_section') as mock_print_section:
+                analyze_security(response, compact=True)
+                
+                # Should call print_section 5 times (one for each category)
+                self.assertEqual(mock_print_section.call_count, 5)
+    
+    def test_analyze_security_prints_summary_header(self):
+        """Test analyze_security prints summary header."""
+        from docksec.utils import analyze_security, AnalyzesResponse
+        
+        response = AnalyzesResponse(
+            vulnerabilities=[],
+            best_practices=[],
+            SecurityRisks=[],
+            ExposedCredentials=[],
+            remediation=[]
+        )
+        
+        with patch('docksec.utils.console') as mock_console:
+            analyze_security(response)
+            
+            # Should print header with AI results
+            mock_console.print.assert_called()
 
 
 if __name__ == '__main__':

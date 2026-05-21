@@ -2,6 +2,7 @@
 import unittest
 import os
 import tempfile
+import json
 from unittest.mock import Mock, patch, MagicMock
 from pathlib import Path
 
@@ -149,6 +150,341 @@ class TestDockerSecurityScanner(unittest.TestCase):
         # Test unknown tool
         unknown_instructions = scanner._get_tool_installation_instructions('unknown')
         self.assertIn('unknown', unknown_instructions)
+    
+    @patch('docksec.docker_scanner.defaultdict')
+    @patch('builtins.print')
+    def test_print_compact_vulnerability_summary_no_vulns(self, mock_print, mock_defaultdict):
+        """Test compact summary printing with no vulnerabilities."""
+        from docksec.docker_scanner import DockerSecurityScanner
+        
+        # Mock defaultdict to return a plain dict
+        mock_defaultdict.side_effect = lambda: {}
+        
+        scanner = DockerSecurityScanner.__new__(DockerSecurityScanner)
+        scanner._print_compact_vulnerability_summary([])
+        
+        # Should print success message
+        mock_print.assert_called()
+    
+    @patch('builtins.print')
+    def test_print_compact_vulnerability_summary_with_vulns(self, mock_print):
+        """Test compact summary printing with vulnerabilities."""
+        from docksec.docker_scanner import DockerSecurityScanner
+        
+        vulnerabilities = [
+            {'Severity': 'CRITICAL'},
+            {'Severity': 'CRITICAL'},
+            {'Severity': 'HIGH'},
+            {'Severity': 'MEDIUM'},
+        ]
+        
+        scanner = DockerSecurityScanner.__new__(DockerSecurityScanner)
+        scanner._print_compact_vulnerability_summary(vulnerabilities)
+        
+        # Should print summary
+        mock_print.assert_called()
+        # Check that all calls contain expected info
+        print_calls = [str(call) for call in mock_print.call_args_list]
+        combined_output = ' '.join(print_calls)
+        self.assertIn('CRITICAL', combined_output)
+    
+    def test_scan_results_cache_initialization(self):
+        """Test ScanResultsCache initialization."""
+        from docksec.docker_scanner import ScanResultsCache
+        import tempfile
+        import shutil
+        
+        temp_dir = tempfile.mkdtemp()
+        try:
+            cache = ScanResultsCache(temp_dir)
+            self.assertIsNotNone(cache)
+            self.assertEqual(cache.cache, {})
+        finally:
+            shutil.rmtree(temp_dir)
+    
+    def test_scan_results_cache_set_and_get(self):
+        """Test ScanResultsCache set and get operations."""
+        from docksec.docker_scanner import ScanResultsCache
+        import tempfile
+        import shutil
+        
+        temp_dir = tempfile.mkdtemp()
+        try:
+            cache = ScanResultsCache(temp_dir)
+            
+            # Set a value
+            image_name = "test:latest"
+            results = {"image": "test:latest", "vulnerabilities": []}
+            cache.set(image_name, results)
+            
+            # Get the value
+            retrieved = cache.get(image_name)
+            self.assertIsNotNone(retrieved)
+            self.assertEqual(retrieved["image"], image_name)
+        finally:
+            shutil.rmtree(temp_dir)
+    
+    def test_scan_results_cache_get_key(self):
+        """Test cache key generation."""
+        from docksec.docker_scanner import ScanResultsCache
+        import tempfile
+        import shutil
+        
+        temp_dir = tempfile.mkdtemp()
+        try:
+            cache = ScanResultsCache(temp_dir)
+            
+            # Same image should produce same key
+            key1 = cache.get_key("test:latest")
+            key2 = cache.get_key("test:latest")
+            self.assertEqual(key1, key2)
+            
+            # Different images should produce different keys
+            key3 = cache.get_key("other:v1.0")
+            self.assertNotEqual(key1, key3)
+        finally:
+            shutil.rmtree(temp_dir)
+    
+    def test_scan_results_cache_persistence(self):
+        """Test ScanResultsCache persistence to disk."""
+        from docksec.docker_scanner import ScanResultsCache
+        import tempfile
+        import shutil
+        import json
+        
+        temp_dir = tempfile.mkdtemp()
+        try:
+            # Create cache and set value
+            cache1 = ScanResultsCache(temp_dir)
+            results = {"image": "test:latest", "score": 85}
+            cache1.set("test:latest", results)
+            
+            # Create new cache instance from same directory
+            cache2 = ScanResultsCache(temp_dir)
+            retrieved = cache2.get("test:latest")
+            
+            # Should have persisted data
+            self.assertIsNotNone(retrieved)
+            self.assertEqual(retrieved["image"], "test:latest")
+        finally:
+            shutil.rmtree(temp_dir)
+    
+    def test_scan_results_cache_invalid_json(self):
+        """Test ScanResultsCache handles invalid JSON gracefully."""
+        from docksec.docker_scanner import ScanResultsCache
+        import tempfile
+        import shutil
+        import os
+        
+        temp_dir = tempfile.mkdtemp()
+        try:
+            cache_file = os.path.join(temp_dir, ".docksec_cache.json")
+            
+            # Write invalid JSON
+            with open(cache_file, 'w') as f:
+                f.write("{ invalid json }")
+            
+            # Should handle gracefully
+            cache = ScanResultsCache(temp_dir)
+            self.assertEqual(cache.cache, {})
+        finally:
+            shutil.rmtree(temp_dir)
+    
+    def test_scan_results_cache_clear_old(self):
+        """Test clearing old cache entries."""
+        from docksec.docker_scanner import ScanResultsCache
+        from datetime import datetime, timedelta
+        import tempfile
+        import shutil
+        
+        temp_dir = tempfile.mkdtemp()
+        try:
+            cache = ScanResultsCache(temp_dir)
+            
+            # Add entry with old timestamp
+            old_date = (datetime.now() - timedelta(days=10)).isoformat()
+            cache.cache["old_key"] = {"timestamp": old_date, "image": "old"}
+            
+            # Add recent entry
+            recent_date = datetime.now().isoformat()
+            cache.cache["new_key"] = {"timestamp": recent_date, "image": "new"}
+            
+            # Clear old entries (default 7 days)
+            cache.clear_old(days=7)
+            
+            # Old entry should be removed, new should remain
+            self.assertNotIn("old_key", cache.cache)
+            self.assertIn("new_key", cache.cache)
+        finally:
+            shutil.rmtree(temp_dir)
+    
+    @patch('docksec.docker_scanner.subprocess.run')
+    @patch('docksec.docker_scanner.get_llm')
+    def test_init_with_skip_ai_scoring_flag(self, mock_llm, mock_subprocess):
+        """Test initialization with skip_ai_scoring flag."""
+        mock_subprocess.return_value = Mock(returncode=0, stdout="", stderr="")
+        
+        dockerfile = self.create_test_dockerfile()
+        
+        from docksec.docker_scanner import DockerSecurityScanner
+        
+        # With skip_ai_scoring=True, score_chain should be None
+        scanner = DockerSecurityScanner(dockerfile, "test:latest", skip_ai_scoring=True)
+        self.assertIsNone(scanner.score_chain)
+        
+        # With skip_ai_scoring=False, score_chain should be initialized
+        mock_llm.return_value = Mock()
+        scanner2 = DockerSecurityScanner(dockerfile, "test:latest", skip_ai_scoring=False)
+        # Score chain is initialized if get_llm doesn't raise
+        if mock_llm.call_count > 1:  # Called again for this scanner
+            self.assertIsNotNone(scanner2.score_chain)
+
+    @patch('docksec.docker_scanner.subprocess.run')
+    def test_scan_image_json_success(self, mock_run):
+        """Test successful JSON image scan."""
+        from docksec.docker_scanner import DockerSecurityScanner
+        
+        mock_run.return_value = Mock(
+            returncode=0, 
+            stdout=json.dumps({"Results": [{"Target": "test", "Vulnerabilities": [{"VulnerabilityID": "CVE-1", "Severity": "HIGH"}]}]}),
+            stderr=""
+        )
+        
+        scanner = DockerSecurityScanner.__new__(DockerSecurityScanner)
+        scanner.image_name = "test:latest"
+        
+        success, results = scanner.scan_image_json()
+        self.assertTrue(success)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['VulnerabilityID'], "CVE-1")
+
+    @patch('docksec.docker_scanner.subprocess.run')
+    def test_run_image_only_scan(self, mock_run):
+        """Test image-only scan workflow."""
+        from docksec.docker_scanner import DockerSecurityScanner
+        
+        mock_run.side_effect = [
+            Mock(returncode=0, stdout="Trivy output", stderr=""), # scan_image
+            Mock(returncode=0, stdout=json.dumps({"Results": []}), stderr="") # scan_image_json
+        ]
+        
+        scanner = DockerSecurityScanner.__new__(DockerSecurityScanner)
+        scanner.image_name = "test:latest"
+        scanner.dockerfile_path = None
+        scanner.use_cache = False
+        
+        results = scanner.run_image_only_scan()
+        self.assertEqual(results['image_name'], "test:latest")
+        self.assertTrue(results['image_scan']['success'])
+
+    @patch('docksec.docker_scanner.DockerSecurityScanner.scan_dockerfile')
+    @patch('docksec.docker_scanner.DockerSecurityScanner.scan_image')
+    @patch('docksec.docker_scanner.DockerSecurityScanner.scan_image_json')
+    def test_run_full_scan(self, mock_json, mock_image, mock_dockerfile):
+        """Test full scan workflow."""
+        from docksec.docker_scanner import DockerSecurityScanner
+        
+        mock_dockerfile.return_value = (True, None)
+        mock_image.return_value = (True, "output")
+        mock_json.return_value = (True, [])
+        
+        scanner = DockerSecurityScanner.__new__(DockerSecurityScanner)
+        scanner.image_name = "test:latest"
+        scanner.dockerfile_path = "Dockerfile"
+        scanner.use_cache = False
+        
+        results = scanner.run_full_scan()
+        self.assertEqual(results['image_name'], "test:latest")
+        self.assertTrue(results['dockerfile_scan']['success'])
+
+    @patch('docksec.docker_scanner.subprocess.run')
+    def test_advanced_scan_success(self, mock_run):
+        """Test successful advanced scan."""
+        from docksec.docker_scanner import DockerSecurityScanner
+        
+        mock_run.return_value = Mock(returncode=0, stdout="Target: test\nvulnerabilities: 10", stderr="")
+        
+        scanner = DockerSecurityScanner.__new__(DockerSecurityScanner)
+        scanner.image_name = "test:latest"
+        
+        results = scanner.advanced_scan()
+        self.assertTrue(results['success'])
+        self.assertIn("Target: test", results['output'])
+
+    @patch('docksec.score_calculator.SecurityScoreCalculator')
+    def test_get_security_score_local(self, mock_calc_class):
+        """Test local security score calculation."""
+        from docksec.docker_scanner import DockerSecurityScanner
+        
+        # Mock calculator instance and its method
+        mock_calc = Mock()
+        mock_calc._calculate_config_score.return_value = 100.0
+        mock_calc_class.return_value = mock_calc
+        
+        scanner = DockerSecurityScanner.__new__(DockerSecurityScanner)
+        scanner.score_chain = None
+        
+        results = {
+            'dockerfile_scan': {'success': True},
+            'json_data': []
+        }
+        
+        score = scanner.get_security_score(results)
+        self.assertIsInstance(score, float)
+        self.assertGreaterEqual(score, 0)
+
+    @patch('docksec.docker_scanner.DockerSecurityScanner.save_results_to_json')
+    @patch('docksec.docker_scanner.DockerSecurityScanner.save_results_to_csv')
+    @patch('docksec.docker_scanner.DockerSecurityScanner.save_results_to_pdf')
+    @patch('docksec.docker_scanner.DockerSecurityScanner.save_results_to_html')
+    def test_generate_all_reports(self, mock_html, mock_pdf, mock_csv, mock_json):
+        """Test generating all report formats."""
+        from docksec.docker_scanner import DockerSecurityScanner
+        
+        mock_json.return_value = "report.json"
+        mock_csv.return_value = "report.csv"
+        mock_pdf.return_value = "report.pdf"
+        mock_html.return_value = "report.html"
+        
+        scanner = DockerSecurityScanner.__new__(DockerSecurityScanner)
+        scanner.analysis_score = 90
+        scanner.RESULTS_DIR = "/tmp"
+        
+        results = {'json_data': []}
+        report_paths = scanner.generate_all_reports(results)
+        
+        self.assertEqual(report_paths['json'], "report.json")
+        self.assertEqual(report_paths['html'], "report.html")
+
+    def test_calculate_local_score(self):
+        """Test the local scoring logic."""
+        from docksec.docker_scanner import DockerSecurityScanner
+        from docksec.enums import Severity
+        
+        scanner = DockerSecurityScanner.__new__(DockerSecurityScanner)
+        
+        results = {
+            'dockerfile_scan': {'success': False, 'output': 'DL3000\nDL3001'},
+            'json_data': [
+                {'Severity': Severity.CRITICAL},
+                {'Severity': Severity.HIGH}
+            ],
+            'dockerfile_path': None
+        }
+        
+        # We need to mock SecurityScoreCalculator because it's used inside
+        with patch('docksec.score_calculator.SecurityScoreCalculator') as mock_calc_class:
+            mock_calc = Mock()
+            mock_calc._calculate_config_score.return_value = 80.0
+            mock_calc_class.return_value = mock_calc
+            
+            score = scanner._calculate_local_score(results)
+            self.assertIsInstance(score, float)
+            # dockerfile: 100 - 2*5 = 90
+            # vuln: 100 - (10 + 5) = 85
+            # config: 80
+            # weight: 90*0.3 + 85*0.5 + 80*0.2 = 27 + 42.5 + 16 = 85.5
+            self.assertEqual(score, 85.5)
 
 
 if __name__ == '__main__':

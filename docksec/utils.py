@@ -254,31 +254,39 @@ init(autoreset=True)
 # Initialize Rich Console
 console = Console()
 
-def print_section(title: str, items: List[str], color: str) -> None:
+def print_section(title: str, items: List[str], color: str, max_items: int = 5) -> None:
     """
-    Print a formatted section with title and items using rich console.
+    Print a compact formatted section with title and limited items.
     
     Args:
         title: Section title
         items: List of items to display
         color: Color for the section (e.g., 'red', 'green', 'yellow')
+        max_items: Maximum number of items to display (default 5)
     """
-    console.print(f"\n[bold {color}]{'=' * (len(title) + 4)}[/]")
-    console.print(f"[bold {color}]| {title} |[/]")
-    console.print(f"[bold {color}]{'=' * (len(title) + 4)}[/]")
-    if items:
-        for i, item in enumerate(items, start=1):
-            console.print(f"[{color}]{i}. {item}[/]")
-    else:
-        console.print("[green]No issues found![/]")
+    if not items:
+        console.print(f"\n[bold {color}]{title}:[/] [green]None found[/]")
+        return
+    
+    console.print(f"\n[bold {color}]{title}:[/] ({len(items)} found)")
+    # Show only top max_items
+    for i, item in enumerate(items[:max_items], start=1):
+        # Truncate long items
+        display_item = item[:80] + "..." if len(item) > 80 else item
+        console.print(f"  {i}. [{color}]{display_item}[/]")
+    
+    if len(items) > max_items:
+        console.print(f"  [dim]... and {len(items) - max_items} more[/]")
 
-def analyze_security(response: AnalyzesResponse) -> None:
+def analyze_security(response: AnalyzesResponse, compact: bool = True) -> None:
     """
-    Analyze and display security findings from Dockerfile analysis.
+    Analyze and display security findings from Dockerfile analysis (compact mode).
     
     Args:
         response: AnalyzesResponse object containing vulnerability findings
+        compact: If True, show only top items; if False, show all
     """
+    max_items = 3 if compact else 10
 
     vulnerabilities = response.vulnerabilities
     best_practices = response.best_practices
@@ -286,34 +294,17 @@ def analyze_security(response: AnalyzesResponse) -> None:
     exposed_credentials = response.ExposedCredentials
     remediation = response.remediation
 
-    # Simulating scanning with tqdm
-    with tqdm(total=100, bar_format="{l_bar}{bar} {n_fmt}/{total_fmt} {elapsed}s[/]") as pbar:
-        console.print("\n[cyan]Scanning Dockerfile...[/]")
-        time.sleep(1)
-        pbar.update(20)
-
-        console.print("[cyan]Analyzing vulnerabilities...[/]")
-        time.sleep(1)
-        pbar.update(20)
-
-        console.print("[cyan]Checking security risks...[/]")
-        time.sleep(1)
-        pbar.update(20)
-
-        console.print("[cyan]Reviewing best practices...[/]")
-        time.sleep(1)
-        pbar.update(20)
-
-        console.print("[cyan]Checking for exposed credentials...[/]")
-        time.sleep(1)
-        pbar.update(20)
-
-    # Print Sections
-    print_section("Vulnerabilities", vulnerabilities, "red")
-    print_section("Best Practices", best_practices, "blue")
-    print_section("Security Risks", security_risks, "yellow")
-    print_section("Exposed Credentials", exposed_credentials, "magenta")
-    print_section("Remediation Steps", remediation, "green")
+    console.print("\n[bold cyan]=== AI Dockerfile Analysis Results ===[/]\n")
+    
+    # Quick summary
+    print_section("Vulnerabilities", vulnerabilities, "red", max_items)
+    print_section("Best Practices", best_practices, "blue", max_items)
+    print_section("Security Risks", security_risks, "yellow", max_items)
+    print_section("Exposed Credentials", exposed_credentials, "magenta", max_items)
+    print_section("Remediation Steps", remediation, "green", max_items)
+    
+    console.print("\n[dim]For detailed AI analysis, check the generated reports[/]")
+    
     
 
 

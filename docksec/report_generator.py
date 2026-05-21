@@ -21,7 +21,7 @@ from typing import Dict, List, Optional
 
 from fpdf import FPDF
 
-from docksec.config import RESULTS_DIR, html_template
+from docksec.config import RESULTS_DIR, get_html_template
 from docksec.utils import get_custom_logger
 
 # Initialize logger
@@ -347,7 +347,7 @@ class ReportGenerator:
             template_vars = self._prepare_html_template_vars(results)
 
             # Replace placeholders in template
-            html_content = html_template
+            html_content = get_html_template()
             for key, value in template_vars.items():
                 html_content = html_content.replace(f"{{{{{key}}}}}", str(value))
 

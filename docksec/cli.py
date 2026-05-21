@@ -46,6 +46,8 @@ def main() -> None:
     parser.add_argument('--provider', choices=LLMProvider.values(),
                        help='LLM provider to use (default: openai, can also set LLM_PROVIDER env var)')
     parser.add_argument('--model', help='Model name to use (e.g., gpt-4o, claude-3-5-sonnet-20241022, gemini-1.5-pro, llama3.1)')
+    parser.add_argument('--compact-output', action='store_true', help='Use compact output format (less verbose)')
+    parser.add_argument('--skip-ai-scoring', action='store_true', help='Skip AI-based security scoring (use local scoring only)')
     parser.add_argument('--version', action='version', version=f'DockSec {get_version()}')
     
     args = parser.parse_args()
@@ -55,6 +57,10 @@ def main() -> None:
         os.environ["LLM_PROVIDER"] = args.provider
     if args.model:
         os.environ["LLM_MODEL"] = args.model
+    
+    # Set compact output mode if requested
+    if args.compact_output:
+        os.environ["DOCKSEC_COMPACT_OUTPUT"] = "true"
     
     # Validate argument combinations
     if args.image_only and args.ai_only:
@@ -90,21 +96,27 @@ def main() -> None:
         run_ai = False
         run_scan = True
         run_dockerfile_analysis = False
+        mode_desc = "Image-only Scan"
     elif args.ai_only:
         run_ai = True
         run_scan = False
         run_dockerfile_analysis = True
+        mode_desc = "AI Analysis Only"
     elif args.scan_only:
         run_ai = False
         run_scan = True
         run_dockerfile_analysis = True
+        mode_desc = "Security Scan Only"
     else:
         # Default: run both AI and scan if both Dockerfile and image are provided
         run_ai = bool(args.dockerfile)
         run_scan = bool(args.image)
         run_dockerfile_analysis = bool(args.dockerfile)
+        mode_desc = "Full Analysis (AI + Scanner)"
     
-    print(f"Analysis mode: AI={'Yes' if run_ai else 'No'}, Scanner={'Yes' if run_scan else 'No'}, Image-only={'Yes' if args.image_only else 'No'}")
+    print(f"\n[INFO] Mode: {mode_desc}")
+    if run_ai:
+        print(f"[INFO] AI Provider: {os.getenv('LLM_PROVIDER', 'openai')}")
     
     # Run the AI-based recommendation tool
     if run_ai:
@@ -119,7 +131,7 @@ def main() -> None:
                 AnalyzesResponse,
                 ScoreResponse
             )
-            from docksec.config import docker_agent_prompt, docker_score_prompt
+            from docksec.config import docker_agent_prompt, docker_score_prompt, truncate_dockerfile
             from pathlib import Path
             
             # Set up the same components as main.py
@@ -134,8 +146,11 @@ def main() -> None:
                 print("Error: No Dockerfile content found.")
                 return
             
-            response = analyser_chain.invoke({"filecontent": filecontent})
-            analyze_security(response)
+            # Truncate Dockerfile to reduce token usage
+            truncated_content = truncate_dockerfile(filecontent, max_lines=50, max_chars=2000)
+            
+            response = analyser_chain.invoke({"filecontent": truncated_content})
+            analyze_security(response, compact=True)
             
         except ImportError as e:
             print(f"Error: Required modules not found - {e}")
@@ -152,7 +167,12 @@ def main() -> None:
             
             # Initialize the scanner
             dockerfile_path = args.dockerfile if run_dockerfile_analysis else None
-            scanner = DockerSecurityScanner(dockerfile_path, args.image, scan_only=args.scan_only or args.image_only)
+            scanner = DockerSecurityScanner(
+                dockerfile_path, 
+                args.image, 
+                scan_only=args.scan_only or args.image_only,
+                skip_ai_scoring=args.skip_ai_scoring
+            )
             
             # Run appropriate scan based on mode
             if args.image_only:
