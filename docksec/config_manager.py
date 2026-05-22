@@ -101,7 +101,7 @@ class DocksecConfig:
             self.llm_model = env_model
         elif self.llm_model == "gpt-4o":  # If still default, adjust based on provider
             if self.llm_provider == LLMProvider.ANTHROPIC:
-                self.llm_model = "claude-3-5-sonnet-20241022"
+                self.llm_model = "claude-haiku-4-5"
             elif self.llm_provider == LLMProvider.GOOGLE:
                 self.llm_model = "gemini-1.5-pro"
             elif self.llm_provider == LLMProvider.OLLAMA:

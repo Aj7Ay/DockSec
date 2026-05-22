@@ -1095,38 +1095,10 @@ class DockerSecurityScanner:
 
         Weights: vulnerabilities 50%, dockerfile quality 30%, configuration 20%.
         """
-        # Dockerfile quality score
-        if results.get('dockerfile_scan', {}).get('success', False):
-            dockerfile_score = 100.0
-        else:
-            output = results.get('dockerfile_scan', {}).get('output', '')
-            issue_count = len(output.split('\n')) if output else 0
-            dockerfile_score = max(0.0, 100.0 - (issue_count * 5))
-
-        # Vulnerability score — weighted by severity
-        vulnerabilities = results.get('json_data', [])
-        if not vulnerabilities:
-            vuln_score = 100.0
-        else:
-            severity_weights = {
-                Severity.CRITICAL: 10,
-                Severity.HIGH: 5,
-                Severity.MEDIUM: 2,
-                Severity.LOW: 1,
-            }
-            deduction = sum(
-                weight * sum(1 for v in vulnerabilities if v.get('Severity') == sev)
-                for sev, weight in severity_weights.items()
-            )
-            vuln_score = max(0.0, 100.0 - deduction)
-
-        # Configuration score — static Dockerfile checks
         from docksec.score_calculator import SecurityScoreCalculator
-        calculator = SecurityScoreCalculator()
-        config_score = calculator._calculate_config_score(results)
-
-        overall = (dockerfile_score * 0.3) + (vuln_score * 0.5) + (config_score * 0.2)
-        score = round(max(0.0, overall), 1)
+        calculator = SecurityScoreCalculator(skip_llm=True)
+        breakdown = calculator.get_score_breakdown(results)
+        score = breakdown['overall']
 
         print(f"Security Score: {score}/100")
         if score >= 90:

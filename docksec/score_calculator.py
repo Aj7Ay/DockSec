@@ -26,9 +26,13 @@ class SecurityScoreCalculator:
     - CVE scores
     """
     
-    def __init__(self):
+    def __init__(self, skip_llm: bool = False):
         """Initialize the security score calculator with LLM chain."""
         logger.info("Initializing SecurityScoreCalculator")
+        if skip_llm:
+            self.score_chain = None
+            return
+
         from docksec.enums import LLMProvider
         from docksec.config_manager import get_config
         config = get_config()
@@ -68,6 +72,11 @@ class SecurityScoreCalculator:
         Raises:
             Exception: If LLM call fails or score calculation errors occur
         """
+        if self.score_chain is None:
+            # Fallback to local breakdown scoring
+            breakdown = self.get_score_breakdown(results)
+            return breakdown['overall']
+
         logger.info("Calculating security score from scan results")
         
         try:

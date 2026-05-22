@@ -185,12 +185,16 @@ def get_llm() -> Union[ChatOpenAI, 'ChatAnthropic', 'ChatGoogleGenerativeAI', 'C
             if not os.getenv("ANTHROPIC_API_KEY"):
                 os.environ["ANTHROPIC_API_KEY"] = api_key
 
-            llm = ChatAnthropic(
-                model=model,
-                temperature=temperature,
-                timeout=timeout,
-                max_retries=max_retries
-            )
+            # Remove temperature if using newer models that don't support it
+            llm_kwargs = {
+                "model": model,
+                "timeout": timeout,
+                "max_retries": max_retries
+            }
+            if not any(model.startswith(prefix) for prefix in ["claude-opus-4", "claude-sonnet-4", "claude-haiku-4"]):
+                llm_kwargs["temperature"] = temperature
+
+            llm = ChatAnthropic(**llm_kwargs)
             logger.info("Anthropic Claude LLM initialized successfully")
             return llm
 
@@ -204,12 +208,16 @@ def get_llm() -> Union[ChatOpenAI, 'ChatAnthropic', 'ChatGoogleGenerativeAI', 'C
             if not os.getenv("GOOGLE_API_KEY"):
                 os.environ["GOOGLE_API_KEY"] = api_key
 
-            llm = ChatGoogleGenerativeAI(
-                model=model,
-                temperature=temperature,
-                timeout=timeout,
-                max_retries=max_retries
-            )
+            # Remove temperature if using newer models that don't support it
+            llm_kwargs = {
+                "model": model,
+                "timeout": timeout,
+                "max_retries": max_retries
+            }
+            if not any(model.startswith(prefix) for prefix in ["gemini-1.5", "gemini-2.0"]):
+                llm_kwargs["temperature"] = temperature
+
+            llm = ChatGoogleGenerativeAI(**llm_kwargs)
             logger.info("Google Gemini LLM initialized successfully")
             return llm
 

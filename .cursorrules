@@ -1,5 +1,7 @@
 # DockSec Cursor Rules
 
-- Do not use "Cursor Agent" or "AI Coding Assistant" in any code comments, documentation, or commit messages.
-- Do not add "Co-authored-by: Cursor" to git commit messages.
-- Keep all code and comments professional and focused on the project functionality.
+- STRICT: NEVER use "Cursor Agent", "AI Coding Assistant", or any AI-specific branding in code, comments, documentation, or commit messages.
+- STRICT: NEVER add "Co-authored-by: Cursor" or any AI attribution to git commit messages. This is a hard requirement for project integrity.
+- All code and comments must be professional, human-centric, and focused strictly on project functionality.
+- Do not use em-dashes; use normal hyphens only.
+- Do not use emojis in any communication or code.

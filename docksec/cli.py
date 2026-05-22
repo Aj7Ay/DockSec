@@ -36,6 +36,7 @@ def main() -> None:
     Main entry point for the DockSec CLI tool.
     Parses arguments and coordinates AI analysis and security scanning.
     """
+    from docksec.enums import LLMProvider
     parser = argparse.ArgumentParser(description='Docker Security Analysis Tool')
     parser.add_argument('dockerfile', nargs='?', help='Path to the Dockerfile to analyze (optional when using --image-only)')
     parser.add_argument('-i', '--image', help='Docker image name to scan')
@@ -120,9 +121,12 @@ def main() -> None:
     
     print(f"\n[INFO] Mode: {mode_desc}")
     from docksec.config import RESULTS_DIR
+    from docksec.config_manager import get_config
+    from docksec.enums import LLMProvider
     print(f"[INFO] Reports will be saved to: {RESULTS_DIR}")
     if run_ai:
-        print(f"[INFO] AI Provider: {os.getenv('LLM_PROVIDER', 'openai')}")
+        config = get_config()
+        print(f"[INFO] AI Provider: {config.llm_provider}")
     
     # Run the AI-based recommendation tool
     if run_ai:
@@ -142,7 +146,6 @@ def main() -> None:
             llm = get_llm()
             
             # Use appropriate structured output method based on provider
-            from docksec.enums import LLMProvider
             config = get_config()
             provider = config.llm_provider
             
@@ -185,7 +188,7 @@ def main() -> None:
             scanner = DockerSecurityScanner(
                 dockerfile_path, 
                 args.image, 
-                scan_only=args.scan_only or args.image_only,
+                scan_only=not run_ai,
                 skip_ai_scoring=args.skip_ai_scoring
             )
             
@@ -204,8 +207,8 @@ def main() -> None:
             # Generate all reports
             scanner.generate_all_reports(results)
             
-            # Run advanced scan if available
-            if hasattr(scanner, 'advanced_scan'):
+            # Run advanced scan if available and image is provided
+            if hasattr(scanner, 'advanced_scan') and args.image:
                 print("\n=== Running Advanced Scan ===")
                 scanner.advanced_scan()
             
