@@ -90,6 +90,9 @@ docksec Dockerfile
 # Scan Dockerfile + Docker image
 docksec Dockerfile -i myapp:latest
 
+# Scan only a Docker image
+docksec --image-only -i myapp:latest
+
 # Fast scan only (no AI)
 docksec Dockerfile --scan-only
 ```
