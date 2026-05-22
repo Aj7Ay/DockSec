@@ -16,9 +16,16 @@ class TestUtils(unittest.TestCase):
         """Test logger creation."""
         from docksec.utils import get_custom_logger
         
-        logger = get_custom_logger('TestLogger')
-        self.assertEqual(logger.name, 'TestLogger')
-        self.assertEqual(logger.level, 20)  # INFO level
+        # Clear CLI mode to ensure default behavior
+        old_cli_mode = os.environ.pop("DOCKSEC_CLI_MODE", None)
+        try:
+            logger = get_custom_logger('TestLogger')
+            self.assertEqual(logger.name, 'TestLogger')
+            self.assertEqual(logger.level, 20)  # INFO level
+        finally:
+            # Restore environment
+            if old_cli_mode:
+                os.environ["DOCKSEC_CLI_MODE"] = old_cli_mode
     
     def test_load_docker_file(self):
         """Test Dockerfile loading."""
