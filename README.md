@@ -11,9 +11,10 @@
 [![CREATED](https://img.shields.io/badge/created-feb,%202025-blue?style=for-the-badge)](https://github.com/OWASP/DockSec/commit/80664db8935e4b5ab44df5867913e)
 
 <picture>
-  <source srcset="https://raw.githubusercontent.com/OWASP/DockSec/main/images/docksec-logo-II.png" media="(prefers-color-scheme: dark)">
-  <img src="https://raw.githubusercontent.com/OWASP/DockSec/main/images/docksec-logo-II.png" alt="DockSec Logo" width="200">
+  <source srcset="https://raw.githubusercontent.com/OWASP/DockSec/main/images/docksec-logo-for-github.png" media="(prefers-color-scheme: dark)">
+  <img src="https://raw.githubusercontent.com/OWASP/DockSec/main/images/docksec-logo-for-github.png" alt="DockSec Logo" width="200">
 </picture>
+<img src="https://raw.githubusercontent.com/OWASP/DockSec/main/images/owasp-logo.png" alt="OWASP Logo" width="400">
 
 # [DockSec](https://owasp.org/DockSec/)
 
