@@ -25,6 +25,10 @@ type: documentation
 </p>
 
 <p align="center">
+  <a href="https://clickpy.clickhouse.com/dashboard/docksec"><img src="https://static.pepy.tech/badge/docksec?style=for-the-badge&color=blue" alt="PyPI Downloads"></a>
+</p>
+
+<p align="center">
   <a href="https://github.com/OWASP/DockSec/issues"><img src="https://img.shields.io/github/issues/OWASP/DockSec?color=blue&style=for-the-badge&label=Issues" alt="Issues"></a>
   <a href="https://github.com/OWASP/DockSec/pulls"><img src="https://img.shields.io/github/issues-pr/OWASP/DockSec?color=blue&style=for-the-badge&label=Pull%20Requests" alt="Pull Requests"></a>
 </p>
