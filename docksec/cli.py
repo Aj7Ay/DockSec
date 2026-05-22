@@ -3,7 +3,7 @@
 import sys
 import os
 import argparse
-from docksec.enums import LLMProvider
+
 
 def get_version() -> str:
     """Return the installed package version.
