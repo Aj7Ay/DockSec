@@ -64,7 +64,7 @@ TEMPLATES_DIR: str = os.path.join(BASE_DIR, "templates")
 # Create results directory if it doesn't exist
 try:
     os.makedirs(RESULTS_DIR, exist_ok=True)
-except Exception as e:
+except Exception:
     # Fallback to local directory if home directory is not writable
     RESULTS_DIR = os.path.join(os.getcwd(), "docksec_results")
     os.makedirs(RESULTS_DIR, exist_ok=True)
