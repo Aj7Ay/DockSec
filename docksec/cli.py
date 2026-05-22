@@ -46,7 +46,7 @@ def main() -> None:
     parser.add_argument('--image-only', action='store_true', help='Scan only the Docker image without Dockerfile analysis')
     parser.add_argument('--provider', choices=LLMProvider.values(),
                        help='LLM provider to use (default: openai, can also set LLM_PROVIDER env var)')
-    parser.add_argument('--model', help='Model name to use (e.g., gpt-4o, claude-3-5-sonnet-20241022, gemini-1.5-pro, llama3.1)')
+    parser.add_argument('--model', help='Model name to use (e.g., gpt-4o, claude-haiku-4-5, gemini-1.5-pro, llama3.1)')
     parser.add_argument('--compact-output', action='store_true', help='Use compact output format (less verbose)')
     parser.add_argument('--skip-ai-scoring', action='store_true', help='Skip AI-based security scoring (use local scoring only)')
     parser.add_argument('--version', action='version', version=f'DockSec {get_version()}')

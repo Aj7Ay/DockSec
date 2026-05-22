@@ -102,7 +102,7 @@ docksec Dockerfile --scan-only
 ## Features
 
 - **Smart Analysis**: AI explains what vulnerabilities mean for *your* specific setup.
-- **Multi-LLM Support**: Use OpenAI, Anthropic Claude, Google Gemini, or local models via Ollama.
+- **Multi-LLM Support**: Use OpenAI, Anthropic Claude (4.x), Google Gemini (1.5+), or local models via Ollama.
 - **Deep Integration**: Combines Trivy (vulnerabilities), Hadolint (linting), and Docker Scout.
 - **Security Scoring**: Get a 0-100 score to track your security posture over time.
 - **Centralized Reporting**: All reports are neatly organized in `~/.docksec/results/` by default.

@@ -77,6 +77,7 @@ export OPENAI_API_KEY="your-key-here"
 # For Anthropic Claude
 export ANTHROPIC_API_KEY="your-key-here"
 export LLM_PROVIDER="anthropic"
+# Note: Defaults to claude-haiku-4-5 (cheapest/fastest)
 
 # For Google Gemini
 export GOOGLE_API_KEY="your-key-here"
