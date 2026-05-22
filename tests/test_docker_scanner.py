@@ -435,7 +435,12 @@ class TestDockerSecurityScanner(unittest.TestCase):
         
         # Mock calculator instance and its method
         mock_calc = Mock()
-        mock_calc._calculate_config_score.return_value = 100.0
+        mock_calc.get_score_breakdown.return_value = {
+            'dockerfile': 100.0,
+            'vulnerabilities': 100.0,
+            'configuration': 100.0,
+            'overall': 100.0
+        }
         mock_calc_class.return_value = mock_calc
         
         scanner = DockerSecurityScanner.__new__(DockerSecurityScanner)
@@ -447,8 +452,7 @@ class TestDockerSecurityScanner(unittest.TestCase):
         }
         
         score = scanner.get_security_score(results)
-        self.assertIsInstance(score, float)
-        self.assertGreaterEqual(score, 0)
+        self.assertEqual(score, 100.0)
 
     @patch('docksec.report_generator.ReportGenerator')
     def test_generate_all_reports(self, mock_report_gen_class):
@@ -498,15 +502,15 @@ class TestDockerSecurityScanner(unittest.TestCase):
         # We need to mock SecurityScoreCalculator because it's used inside
         with patch('docksec.score_calculator.SecurityScoreCalculator') as mock_calc_class:
             mock_calc = Mock()
-            mock_calc._calculate_config_score.return_value = 80.0
+            mock_calc.get_score_breakdown.return_value = {
+                'dockerfile': 90.0,
+                'vulnerabilities': 85.0,
+                'configuration': 80.0,
+                'overall': 85.5
+            }
             mock_calc_class.return_value = mock_calc
             
             score = scanner._calculate_local_score(results)
-            self.assertIsInstance(score, float)
-            # dockerfile: 100 - 2*5 = 90
-            # vuln: 100 - (10 + 5) = 85
-            # config: 80
-            # weight: 90*0.3 + 85*0.5 + 80*0.2 = 27 + 42.5 + 16 = 85.5
             self.assertEqual(score, 85.5)
 
 
