@@ -99,7 +99,7 @@ Ensure your network security policies allow these connections if needed.
 
 ### 1. AI Model Limitations
 
-- DockSec uses OpenAI's GPT-4 for analysis
+- DockSec supports multiple LLM providers for AI analysis (including OpenAI when configured)
 - AI recommendations should be reviewed by security professionals
 - AI models can make mistakes or miss vulnerabilities
 - Always combine AI analysis with traditional scanning tools
