@@ -1,5 +1,5 @@
 ---
-title: Getting-Started
+title: gettingstarted
 displaytext: Getting Started
 layout: null
 tab: true

@@ -1,5 +1,5 @@
 ---
-title: Announcements
+title: announcements
 displaytext: Announcements
 layout: null
 tab: true

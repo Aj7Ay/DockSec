@@ -1,5 +1,5 @@
 ---
-title: Leadership
+title: leadership
 displaytext: Leadership
 layout: null
 tab: true
