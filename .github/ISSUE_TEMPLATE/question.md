@@ -36,6 +36,6 @@ Any additional information that might help answer the question.
 ---
 
 Before asking, please check:
-- [ ] [README documentation](https://github.com/advaitpatel/DockSec/blob/main/README.md)
-- [ ] [Existing issues](https://github.com/advaitpatel/DockSec/issues)
-- [ ] [Examples directory](https://github.com/advaitpatel/DockSec/tree/main/examples)
+- [ ] [README documentation](https://github.com/OWASP/DockSec/blob/main/README.md)
+- [ ] [Existing issues](https://github.com/OWASP/DockSec/issues)
+- [ ] [Examples directory](https://github.com/OWASP/DockSec/tree/main/examples)

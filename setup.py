@@ -10,7 +10,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="Advait Patel",
-    url="https://github.com/advaitpatel/DockSec",
+    url="https://github.com/OWASP/DockSec",
     packages=find_packages(),
     entry_points={
         "console_scripts": [
@@ -18,9 +18,9 @@ setup(
         ],
     },
     project_urls={
-        "Bug Tracker": "https://github.com/advaitpatel/DockSec/issues",
-        "Documentation": "https://github.com/advaitpatel/DockSec/blob/main/README.md",
-        "Source Code": "https://github.com/advaitpatel/DockSec",
+        "Bug Tracker": "https://github.com/OWASP/DockSec/issues",
+        "Documentation": "https://github.com/OWASP/DockSec/blob/main/README.md",
+        "Source Code": "https://github.com/OWASP/DockSec",
     },
     python_requires=">=3.12",
     install_requires=[

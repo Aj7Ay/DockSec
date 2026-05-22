@@ -119,7 +119,7 @@ docksec Dockerfile
 
 ### Fixed
 - 🔗 **Broken Links and References**
-  - Fixed GitHub stars badge URL (docksec/docksec → advaitpatel/DockSec)
+  - Fixed GitHub stars badge URL (docksec/docksec → OWASP/DockSec)
   - Removed placeholder Docker Hub link
   - Fixed CONTRIBUTING.md reference (file now exists)
   - Replaced "Coming Soon" demo video section with actual examples
@@ -354,5 +354,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to contribute to this 
 ## Support
 
 For issues, questions, or feature requests, please visit:
-- GitHub Issues: https://github.com/advaitpatel/DockSec/issues
-- Documentation: https://github.com/advaitpatel/DockSec/blob/main/README.md
+- GitHub Issues: https://github.com/OWASP/DockSec/issues
+- Documentation: https://github.com/OWASP/DockSec/blob/main/README.md

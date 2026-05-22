@@ -1,3 +1,11 @@
+---
+layout: col-sidebar
+title: OWASP DockSec
+tags: docker, security, ai, scanner, devsecops, owasp
+level: 2
+type: documentation
+---
+
 [![GitHub Repo stars](https://img.shields.io/github/stars/OWASP/DockSec?style=flat)](https://github.com/OWASP/DockSec)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PyPI version](https://img.shields.io/pypi/v/docksec.svg)](https://pypi.org/project/docksec/)
@@ -5,29 +13,10 @@
 [![OWASP Incubator](https://img.shields.io/badge/OWASP-Incubator%20Project-48A646?logo=owasp)](https://owasp.org/www-project-docksec/)
 
 <div align="center">
-  <img src="https://github.com/OWASP/DockSec/blob/main/images/docksec-logo-II.png" alt="DockSec" height="120">
+  <img src="https://raw.githubusercontent.com/OWASP/DockSec/main/images/docksec-logo-II.png" alt="DockSec" height="120">
   
   <h1>DockSec</h1>
   <p><strong>AI-powered Docker security scanner that explains vulnerabilities in plain English</strong></p>
-  
-  <p>
-    <a href="#quick-start">Quick Start</a> •
-    <a href="#features">Features</a> •
-    <a href="#installation">Installation</a> •
-    <a href="#usage">Usage</a> •
-    <a href="docs/CONTRIBUTING.md">Contributing</a> •
-    <a href="docs/CHANGELOG.md">Changelog</a>
-  </p>
-  
-  <br>
-  
-  <p>
-    <a href="https://owasp.org/www-project-docksec/">
-      <img src="images/owasp-logo.png" alt="OWASP" height="60">
-    </a>
-  </p>
-  <p><strong>🏆 Officially recognized as an OWASP Incubator Project</strong></p>
-  <p>Trusted by the global security community • 14,000+ downloads</p>
 </div>
 
 ---
@@ -58,7 +47,7 @@ Being recognized as an [OWASP Incubator Project](https://owasp.org/www-project-d
 ## How It Works
 
 <div align="center">
-  <img src="images/workflow.png" alt="DockSec Workflow" width="800">
+  <img src="https://raw.githubusercontent.com/OWASP/DockSec/main/images/workflow.png" alt="DockSec Workflow" width="800">
   <p><em>DockSec workflow: From scanning to actionable insights</em></p>
 </div>
 
@@ -169,58 +158,6 @@ docksec Dockerfile --provider anthropic --model claude-3-5-sonnet-20241022
 docksec Dockerfile -o my_report.html
 ```
 
-### CLI Options
-
-| Option | Description |
-|--------|-------------|
-| `dockerfile` | Path to the Dockerfile to analyze |
-| `-i, --image` | Docker image name to scan |
-| `-o, --output` | Custom output file path |
-| `--provider` | LLM provider (openai, anthropic, google, ollama) |
-| `--model` | Specific model name to use |
-| `--ai-only` | Run AI analysis only (requires Dockerfile) |
-| `--scan-only` | Run security scanners only (no AI) |
-| `--image-only` | Scan image without Dockerfile analysis |
-| `--version` | Show version information |
-
----
-
-## Configuration
-
-You can customize DockSec via environment variables or a `.env` file:
-
-```bash
-# LLM Settings
-LLM_PROVIDER=openai           # openai, anthropic, google, ollama
-LLM_MODEL=gpt-4o              # Model name
-LLM_TEMPERATURE=0.0           # Creativity (0.0 recommended for security)
-
-# Results & Timeouts
-DOCKSEC_RESULTS_DIR=./results # Where to save reports
-TRIVY_SCAN_TIMEOUT=600        # Timeout for image scans
-```
-
----
-
-## Example Output
-
-```text
-🔍 Scanning Dockerfile...
-⚠️  Security Score: 45/100
-
-Critical Issues (3):
-  • Running as root user (line 12)
-  • Hardcoded API key detected (line 23)
-  • Using vulnerable base image (ubuntu:20.04)
-
-💡 AI Recommendations:
-  1. Add non-root user: RUN useradd -m appuser && USER appuser
-  2. Move secrets to environment variables or build secrets.
-  3. Update FROM ubuntu:20.04 to ubuntu:22.04 (fixes 12 CVEs).
-
-📊 Full report generated: results/nginx_latest_security_report.html
-```
-
 ---
 
 ## Roadmap
@@ -234,27 +171,11 @@ Critical Issues (3):
 
 ---
 
-## Troubleshooting
-
-**"No API Key provided"**  
-→ Set your API key (e.g., `OPENAI_API_KEY`) or use `--scan-only` mode.
-
-**"Hadolint/Trivy not found"**  
-→ Run `python -m docksec.setup_external_tools` to install them automatically.
-
-**"Python version not supported"**  
-→ DockSec requires Python 3.12+. We recommend using `pyenv` or `conda` to manage versions.
-
-**"Connection refused" with Ollama**  
-→ Ensure the Ollama daemon is running (`ollama serve`) and you have pulled the model (`ollama pull llama3.1`).
-
----
-
 ## Recognition & Community
 
 <div align="center">
   <a href="https://owasp.org/www-project-docksec/">
-    <img src="images/owasp-logo.png" alt="OWASP" height="80">
+    <img src="https://raw.githubusercontent.com/OWASP/DockSec/main/images/owasp-logo.png" alt="OWASP" height="80">
   </a>
 </div>
 

@@ -21,7 +21,7 @@ We take the security of DockSec seriously. If you believe you have found a secur
 Instead, please report them via one of the following methods:
 
 1. **Email**: Send an email to [advaitpa93@gmail.com](mailto:advaitpa93@gmail.com) with the subject line "SECURITY: [Brief Description]"
-2. **GitHub Security Advisory**: Use GitHub's private vulnerability reporting feature at https://github.com/advaitpatel/DockSec/security/advisories/new
+2. **GitHub Security Advisory**: Use GitHub's private vulnerability reporting feature at https://github.com/OWASP/DockSec/security/advisories/new
 
 ### What to Include
 

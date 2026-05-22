@@ -301,8 +301,8 @@ Maintainers follow this process for releases:
 ### Getting Help
 
 - Read the [README](../README.md)
-- Check [existing issues](https://github.com/advaitpatel/DockSec/issues)
-- Ask questions in [Discussions](https://github.com/advaitpatel/DockSec/discussions)
+- Check [existing issues](https://github.com/OWASP/DockSec/issues)
+- Ask questions in [Discussions](https://github.com/OWASP/DockSec/discussions)
 
 ## 📄 License
 
