@@ -53,6 +53,24 @@ class TestDockerSecurityScanner(unittest.TestCase):
         self.assertEqual(scanner.dockerfile_path, str(Path(dockerfile).resolve()))
         self.assertEqual(scanner.image_name, "test:latest")
         self.assertIsNone(scanner.analysis_score)
+        # Should require docker, trivy, and hadolint
+        self.assertIn('docker', scanner.required_tools)
+        self.assertIn('trivy', scanner.required_tools)
+        self.assertIn('hadolint', scanner.required_tools)
+
+    @patch('docksec.docker_scanner.subprocess.run')
+    def test_init_dockerfile_only(self, mock_subprocess):
+        """Test initialization with only a Dockerfile (no image)."""
+        mock_subprocess.return_value = Mock(returncode=0, stdout="", stderr="")
+        
+        dockerfile = self.create_test_dockerfile()
+        from docksec.docker_scanner import DockerSecurityScanner
+        
+        scanner = DockerSecurityScanner(dockerfile, None, scan_only=True)
+        self.assertEqual(scanner.image_name, None)
+        self.assertIn('hadolint', scanner.required_tools)
+        self.assertIn('trivy', scanner.required_tools)
+        self.assertNotIn('docker', scanner.required_tools)
     
     def test_validate_image_name(self):
         """Test image name validation."""
@@ -432,28 +450,34 @@ class TestDockerSecurityScanner(unittest.TestCase):
         self.assertIsInstance(score, float)
         self.assertGreaterEqual(score, 0)
 
-    @patch('docksec.docker_scanner.DockerSecurityScanner.save_results_to_json')
-    @patch('docksec.docker_scanner.DockerSecurityScanner.save_results_to_csv')
-    @patch('docksec.docker_scanner.DockerSecurityScanner.save_results_to_pdf')
-    @patch('docksec.docker_scanner.DockerSecurityScanner.save_results_to_html')
-    def test_generate_all_reports(self, mock_html, mock_pdf, mock_csv, mock_json):
+    @patch('docksec.report_generator.ReportGenerator')
+    def test_generate_all_reports(self, mock_report_gen_class):
         """Test generating all report formats."""
         from docksec.docker_scanner import DockerSecurityScanner
-        
-        mock_json.return_value = "report.json"
-        mock_csv.return_value = "report.csv"
-        mock_pdf.return_value = "report.pdf"
-        mock_html.return_value = "report.html"
-        
+    
+        # Mock the generator instance and its return value
+        mock_gen = Mock()
+        mock_gen.generate_all_reports.return_value = {
+            'json': 'report.json',
+            'csv': 'report.csv',
+            'pdf': 'report.pdf',
+            'html': 'report.html'
+        }
+        mock_report_gen_class.return_value = mock_gen
+    
         scanner = DockerSecurityScanner.__new__(DockerSecurityScanner)
+        scanner.image_name = "test:latest"
         scanner.analysis_score = 90
         scanner.RESULTS_DIR = "/tmp"
-        
+    
         results = {'json_data': []}
-        report_paths = scanner.generate_all_reports(results)
+        # Mock get_security_score to avoid LLM call
+        with patch.object(DockerSecurityScanner, 'get_security_score', return_value=90.0):
+            report_paths = scanner.generate_all_reports(results)
         
         self.assertEqual(report_paths['json'], "report.json")
         self.assertEqual(report_paths['html'], "report.html")
+        mock_gen.generate_all_reports.assert_called_once_with(results)
 
     def test_calculate_local_score(self):
         """Test the local scoring logic."""

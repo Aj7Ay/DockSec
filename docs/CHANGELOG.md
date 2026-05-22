@@ -5,6 +5,24 @@ All notable changes to DockSec will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.5.22] - 2026-05-22
+
+### Added
+- **Centralized Reporting**: All scan reports are now neatly organized in `~/.docksec/results/` by default, following industry standards for professional CLI tools.
+- **Enhanced `--scan-only` Mode**: Improved the scanner to support Dockerfile-only scans without requiring a Docker image name, enabling high-speed static analysis in any environment.
+
+### Changed
+- **Modernized PDF Engine**: Refactored the PDF generation to use the latest `fpdf2` APIs, improving performance and future-proofing the reporting engine.
+- **Improved Storage Logic**: Added automatic directory creation and a smart fallback to local storage if the home directory is not writable.
+- **CLI Feedback**: The tool now explicitly prints the report storage location at the start of every scan for better visibility.
+
+### Fixed
+- **PDF Layout**: Resolved the "Not enough horizontal space" error that occurred during PDF generation for complex scan results.
+- **Deprecation Warnings**: Eliminated all font and layout-related deprecation warnings from the `fpdf2` library.
+- **Test Suite**: Updated and expanded the unit test suite to cover new reporting logic and dynamic tool requirements, achieving 100% pass rate.
+
+---
+
 ## [2026.5.21] - 2026-05-21
 
 ### Added

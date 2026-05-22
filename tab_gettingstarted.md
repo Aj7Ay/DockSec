@@ -85,12 +85,23 @@ export LLM_PROVIDER="google"
 
 ## Generating Reports
 
-DockSec can generate professional reports in multiple formats:
+DockSec automatically generates professional reports in multiple formats (HTML, PDF, JSON, CSV) for every scan.
+
+By default, all reports are saved to:
+`~/.docksec/results/`
+
+You can override this location using an environment variable:
+```bash
+export DOCKSEC_RESULTS_DIR="/path/to/your/reports"
+```
+
+### Quick Scan (No AI)
+If you want a lightning-fast scan without AI analysis:
 
 ```bash
-# Generate an interactive HTML report
-docksec Dockerfile -o report.html
+# Scan only the Dockerfile
+docksec Dockerfile --scan-only
 
-# Generate a JSON report for CI/CD integration
-docksec Dockerfile -o report.json
+# Scan only an image
+docksec --image-only -i nginx:latest
 ```

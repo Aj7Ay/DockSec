@@ -169,6 +169,17 @@ class TestConfig(unittest.TestCase):
         self.assertIn("<html", template.lower())
         self.assertIn("Docker Security Report", template)
 
+    def test_results_dir_default(self):
+        """Test that RESULTS_DIR defaults to home directory."""
+        from docksec.config import RESULTS_DIR
+        
+        home_docksec = os.path.join(os.path.expanduser("~"), ".docksec", "results")
+        # It should either be the home dir or the fallback local dir
+        self.assertTrue(
+            RESULTS_DIR == home_docksec or 
+            RESULTS_DIR.endswith("docksec_results")
+        )
+
 
 if __name__ == '__main__':
     unittest.main()

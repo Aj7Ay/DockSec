@@ -84,10 +84,14 @@ Integrate DockSec into your GitHub Actions workflow:
 pip install docksec
 
 # Scan a Dockerfile (AI-powered)
+# Reports will be saved to ~/.docksec/results/
 docksec Dockerfile
 
 # Scan Dockerfile + Docker image
 docksec Dockerfile -i myapp:latest
+
+# Fast scan only (no AI)
+docksec Dockerfile --scan-only
 ```
 
 ---
@@ -98,7 +102,8 @@ docksec Dockerfile -i myapp:latest
 - **Multi-LLM Support**: Use OpenAI, Anthropic Claude, Google Gemini, or local models via Ollama.
 - **Deep Integration**: Combines Trivy (vulnerabilities), Hadolint (linting), and Docker Scout.
 - **Security Scoring**: Get a 0-100 score to track your security posture over time.
-- **Rich Reporting**: Professional exports in HTML (interactive), PDF, JSON, and CSV.
+- **Centralized Reporting**: All reports are neatly organized in `~/.docksec/results/` by default.
+- **Rich Formats**: Professional exports in HTML (interactive), PDF, JSON, and CSV.
 - **CI/CD Ready**: Designed for easy integration into GitHub Actions and build pipelines.
 - **GitHub Action**: Available on the GitHub Marketplace for automated security scans.
 

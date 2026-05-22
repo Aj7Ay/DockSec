@@ -55,13 +55,19 @@ if OPENAI_API_KEY:
 BASE_DIR: str = os.path.abspath(os.path.dirname(__file__))
 
 # Results directory configuration
-# Priority: 1. Environment variable, 2. DockSec installation directory (default)
+# Priority: 1. Environment variable, 2. Home directory (default), 3. Local directory (fallback)
 # Users can customize by setting: export DOCKSEC_RESULTS_DIR=/custom/path
-RESULTS_DIR: str = os.getenv("DOCKSEC_RESULTS_DIR", os.path.join(BASE_DIR, "results"))
+DEFAULT_RESULTS_DIR: str = os.path.join(os.path.expanduser("~"), ".docksec", "results")
+RESULTS_DIR: str = os.getenv("DOCKSEC_RESULTS_DIR", DEFAULT_RESULTS_DIR)
 TEMPLATES_DIR: str = os.path.join(BASE_DIR, "templates")
 
 # Create results directory if it doesn't exist
-os.makedirs(RESULTS_DIR, exist_ok=True)
+try:
+    os.makedirs(RESULTS_DIR, exist_ok=True)
+except Exception as e:
+    # Fallback to local directory if home directory is not writable
+    RESULTS_DIR = os.path.join(os.getcwd(), "docksec_results")
+    os.makedirs(RESULTS_DIR, exist_ok=True)
 
 
 def get_html_template() -> str:

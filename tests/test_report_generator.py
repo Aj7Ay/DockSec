@@ -35,6 +35,8 @@ def test_json_report_file_is_created(
     results = make_results(sample_vulnerabilities, sample_scan_info)
     output_path = rg.generate_json_report(results)
     assert os.path.exists(output_path)
+    # Verify it's in the correct directory
+    assert os.path.dirname(output_path) == str(tmp_path)
 
 
 def test_json_report_has_required_keys(

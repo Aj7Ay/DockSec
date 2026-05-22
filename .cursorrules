@@ -1,0 +1,5 @@
+# DockSec Cursor Rules
+
+- Do not use "Cursor Agent" or "AI Coding Assistant" in any code comments, documentation, or commit messages.
+- Do not add "Co-authored-by: Cursor" to git commit messages.
+- Keep all code and comments professional and focused on the project functionality.

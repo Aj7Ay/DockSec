@@ -174,6 +174,13 @@ mypy .
 
 We follow Python best practices and use automated tools to maintain code quality.
 
+### AI & Tooling Guidelines
+
+To maintain project integrity and professional standards:
+- **No AI Branding**: Do not use "Cursor Agent", "AI Coding Assistant", or similar AI-specific branding in code comments, documentation, or commit messages.
+- **Clean Commits**: Do not include "Co-authored-by: Cursor" or other automated AI attribution in git commit messages.
+- **Human-Centric**: All code and documentation should be professional, technical, and focused on project functionality.
+
 ### Style Tools
 
 - **Black** for code formatting

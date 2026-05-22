@@ -86,10 +86,14 @@ def main() -> None:
         sys.exit(1)
     
     # Validate image requirement for image-based operations
-    if (args.image_only or args.scan_only) and not args.image:
-        print(f"Error: Image name is required for {'image-only scanning' if args.image_only else 'scan-only mode'}. Use -i/--image to specify the Docker image.")
+    if args.image_only and not args.image:
+        print("Error: Image name is required for image-only scanning. Use -i/--image to specify the Docker image.")
         print("Example: docksec --image-only -i myapp:latest")
         sys.exit(1)
+    
+    # In scan-only mode, if no image is provided, we'll only run Dockerfile analysis
+    if args.scan_only and not args.image:
+        print("[INFO] No image provided for scan-only mode. Running Dockerfile analysis only.")
     
     # Determine which tools to run
     if args.image_only:
@@ -115,6 +119,8 @@ def main() -> None:
         mode_desc = "Full Analysis (AI + Scanner)"
     
     print(f"\n[INFO] Mode: {mode_desc}")
+    from docksec.config import RESULTS_DIR
+    print(f"[INFO] Reports will be saved to: {RESULTS_DIR}")
     if run_ai:
         print(f"[INFO] AI Provider: {os.getenv('LLM_PROVIDER', 'openai')}")
     
