@@ -22,7 +22,7 @@ type: documentation
 <p align="center">
   <a href="https://github.com/OWASP/DockSec/network/members"><img src="https://img.shields.io/github/forks/OWASP/DockSec?style=for-the-badge&label=Forks&color=blue" alt="Forks"></a>
   <a href="https://github.com/OWASP/DockSec/stargazers"><img src="https://img.shields.io/github/stars/OWASP/DockSec?style=for-the-badge&label=Stars&color=blue" alt="Stars"></a>
-  <a href="https://clickpy.clickhouse.com/dashboard/docksec"><img src="https://img.shields.io/badge/dynamic/json?style=for-the-badge&label=Downloads&query=$.total_downloads&url=https://api.pepy.tech/api/v2/projects/docksec&color=blue" alt="PyPI Downloads"></a>
+  <img src="https://img.shields.io/pepy/dt/docksec?style=for-the-badge&color=blue" alt="PyPI Downloads">
 </p>
 
 <p align="center">
