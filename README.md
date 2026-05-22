@@ -1,21 +1,21 @@
 <div align="center">
 
-[![OWASP](https://img.shields.io/badge/OWASP-Incubator%20Project-48A646?logo=owasp&style=for-the-badge)](https://owasp.org/www-project-docksec/)
-[![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](https://github.com/OWASP/DockSec/blob/main/LICENSE)
-[![PyPI version](https://img.shields.io/pypi/v/docksec.svg?style=for-the-badge&color=blue)](https://pypi.org/project/docksec/)
-[![Python Version](https://img.shields.io/pypi/pyversions/docksec.svg?style=for-the-badge&color=blue)](https://pypi.org/project/docksec/)
+[![OWASP](https://img.shields.io/badge/Incubator-blue?&label=level&style=for-the-badge)](https://owasp.org/DockSec/) [![OWASP](https://img.shields.io/badge/Code-blue?label=type&style=for-the-badge)](https://owasp.org/DockSec/) [![project-docksec](https://img.shields.io/badge/%23project--docksec-blue?label=slack&logoColor=white&style=for-the-badge)](https://owasp.slack.com/archives/C0APXGCUW7M)
 
-[![Build Status](https://img.shields.io/github/actions/workflow/status/OWASP/DockSec/python-app.yml?branch=main&style=for-the-badge&label=Build)](https://github.com/OWASP/DockSec/actions)
-[![Contributors](https://img.shields.io/github/contributors/OWASP/DockSec?style=for-the-badge&label=Contributors&color=blue)](https://github.com/OWASP/DockSec/graphs/contributors)
-[![Stars](https://img.shields.io/github/stars/OWASP/DockSec?style=for-the-badge&label=Stars&color=blue)](https://github.com/OWASP/DockSec/stargazers)
-[![Issues](https://img.shields.io/github/issues/OWASP/DockSec?style=for-the-badge&label=Issues&color=blue)](https://github.com/OWASP/DockSec/issues)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/OWASP/DockSec/python-app.yml?branch=main&style=for-the-badge&label=Build&color=blue)](https://github.com/OWASP/DockSec/actions) [![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](https://github.com/OWASP/DockSec/blob/main/LICENSE) [![Last Commit](https://img.shields.io/github/last-commit/OWASP/DockSec/main?color=blue&style=for-the-badge&label=Last%20commit)](https://github.com/OWASP/DockSec/commits/main/)
+
+[![Contributors](https://img.shields.io/github/contributors/OWASP/DockSec?style=for-the-badge&label=Contributors&color=blue)](https://github.com/OWASP/DockSec/graphs/contributors) [![Forks](https://img.shields.io/github/forks/OWASP/DockSec?style=for-the-badge&label=Forks&color=blue)](https://github.com/OWASP/DockSec/network/members) [![Stars](https://img.shields.io/github/stars/OWASP/DockSec?style=for-the-badge&label=Stars&color=blue)](https://github.com/OWASP/DockSec/stargazers)
+
+[![Issues](https://img.shields.io/github/issues/OWASP/DockSec?color=blue&style=for-the-badge&label=Issues)](https://github.com/OWASP/DockSec/issues) [![Pull Requests](https://img.shields.io/github/issues-pr/OWASP/DockSec?color=blue&style=for-the-badge&label=Pull%20Requests)](https://github.com/OWASP/DockSec/pulls)
+
+[![CREATED](https://img.shields.io/badge/created-feb,%202025-blue?style=for-the-badge)](https://github.com/OWASP/DockSec/commit/80664db8935e4b5ab44df5867913e)
 
 <picture>
   <source srcset="https://raw.githubusercontent.com/OWASP/DockSec/main/images/docksec-logo-II.png" media="(prefers-color-scheme: dark)">
   <img src="https://raw.githubusercontent.com/OWASP/DockSec/main/images/docksec-logo-II.png" alt="DockSec Logo" width="200">
 </picture>
 
-# [DockSec](https://owasp.org/www-project-docksec/)
+# [DockSec](https://owasp.org/DockSec/)
 
 **AI-powered Docker security scanner that explains vulnerabilities in plain English**
 
@@ -59,7 +59,7 @@ DockSec is led by a dedicated team committed to making container security access
 
 - [Advait Patel](https://github.com/advaitpatel) - Project Lead
 
-For questions or discussions, please join the [#project-docksec](https://owasp.slack.com/archives/C07M1C4JASK) channel on OWASP Slack.
+For questions or discussions, please join the [#project-docksec](https://owasp.slack.com/archives/C0APXGCUW7M) channel on OWASP Slack.
 
 ---
 
@@ -98,14 +98,14 @@ DockSec thrives on community contributions. Whether you are a developer, designe
 - **Issue Reporting**: Identify and report bugs.
 - **Feedback**: Share your experience and suggestions.
 
-To get started, check out our [Contributing Guidelines](docs/CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md).
+To get started, check out our [Contributing Guidelines](CONTRIBUTING.md), [Code of Conduct](CODE_OF_CONDUCT.md), and [Sponsorship Guide](SPONSORSHIP.md).
 
 ---
 
 ## Community and Social Media
 
-- **OWASP Project Page**: [owasp.org/www-project-docksec/](https://owasp.org/www-project-docksec/)
-- **OWASP Slack**: [#project-docksec](https://owasp.org/slack/invite)
+- **OWASP Project Page**: [owasp.org/DockSec/](https://owasp.org/DockSec/)
+- **OWASP Slack**: [#project-docksec](https://owasp.slack.com/archives/C0APXGCUW7M)
 - **PyPI**: [pypi.org/project/docksec/](https://pypi.org/project/docksec/)
 - **Issues**: [Report a bug](https://github.com/OWASP/DockSec/issues)
 

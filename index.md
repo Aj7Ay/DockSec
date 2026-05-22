@@ -6,23 +6,40 @@ level: 2
 type: documentation
 ---
 
-<div align="center">
+<p align="center">
+  <a href="https://owasp.org/DockSec/"><img src="https://img.shields.io/badge/Incubator-blue?&label=level&style=for-the-badge" alt="OWASP Incubator"></a>
+  <a href="https://owasp.org/DockSec/"><img src="https://img.shields.io/badge/Code-blue?label=type&style=for-the-badge" alt="OWASP Code"></a>
+  <a href="https://owasp.slack.com/archives/C0APXGCUW7M"><img src="https://img.shields.io/badge/%23project--docksec-blue?label=slack&logoColor=white&style=for-the-badge" alt="Slack"></a>
+</p>
 
-[![OWASP](https://img.shields.io/badge/OWASP-Incubator%20Project-48A646?logo=owasp&style=for-the-badge)](https://owasp.org/www-project-docksec/)
-[![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](https://github.com/OWASP/DockSec/blob/main/LICENSE)
-[![PyPI version](https://img.shields.io/pypi/v/docksec.svg?style=for-the-badge&color=blue)](https://pypi.org/project/docksec/)
-[![Python Version](https://img.shields.io/pypi/pyversions/docksec.svg?style=for-the-badge&color=blue)](https://pypi.org/project/docksec/)
+<p align="center">
+  <a href="https://github.com/OWASP/DockSec/actions"><img src="https://img.shields.io/github/actions/workflow/status/OWASP/DockSec/python-app.yml?branch=main&style=for-the-badge&label=Build&color=blue" alt="Build Status"></a>
+  <a href="https://github.com/OWASP/DockSec/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="License"></a>
+  <a href="https://github.com/OWASP/DockSec/commits/main/"><img src="https://img.shields.io/github/last-commit/OWASP/DockSec/main?color=blue&style=for-the-badge&label=Last%20commit" alt="Last Commit"></a>
+</p>
 
-<picture>
-  <source srcset="https://raw.githubusercontent.com/OWASP/DockSec/main/images/docksec-logo-II.png" media="(prefers-color-scheme: dark)">
+<p align="center">
+  <a href="https://github.com/OWASP/DockSec/graphs/contributors"><img src="https://img.shields.io/github/contributors/OWASP/DockSec?style=for-the-badge&label=Contributors&color=blue" alt="Contributors"></a>
+  <a href="https://github.com/OWASP/DockSec/network/members"><img src="https://img.shields.io/github/forks/OWASP/DockSec?style=for-the-badge&label=Forks&color=blue" alt="Forks"></a>
+  <a href="https://github.com/OWASP/DockSec/stargazers"><img src="https://img.shields.io/github/stars/OWASP/DockSec?style=for-the-badge&label=Stars&color=blue" alt="Stars"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/OWASP/DockSec/issues"><img src="https://img.shields.io/github/issues/OWASP/DockSec?color=blue&style=for-the-badge&label=Issues" alt="Issues"></a>
+  <a href="https://github.com/OWASP/DockSec/pulls"><img src="https://img.shields.io/github/issues-pr/OWASP/DockSec?color=blue&style=for-the-badge&label=Pull%20Requests" alt="Pull Requests"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/OWASP/DockSec/commit/80664db8935e4b5ab44df5867913e"><img src="https://img.shields.io/badge/created-feb,%202025-blue?style=for-the-badge" alt="Created"></a>
+</p>
+
+<p align="center">
   <img src="https://raw.githubusercontent.com/OWASP/DockSec/main/images/docksec-logo-II.png" alt="DockSec Logo" width="200">
-</picture>
+</p>
 
-# [DockSec](https://owasp.org/www-project-docksec/)
+<h1 align="center"><a href="https://owasp.org/DockSec/">DockSec</a></h1>
 
-**AI-powered Docker security scanner that explains vulnerabilities in plain English**
-
-</div>
+<p align="center"><strong>AI-powered Docker security scanner that explains vulnerabilities in plain English</strong></p>
 
 ---
 
@@ -69,8 +86,8 @@ DockSec follows a robust four-stage pipeline:
 
 ## Community and Social Media
 
-- **OWASP Project Page**: [owasp.org/www-project-docksec/](https://owasp.org/www-project-docksec/)
-- **OWASP Slack**: [#project-docksec](https://owasp.org/slack/invite)
+- **OWASP Project Page**: [owasp.org/DockSec/](https://owasp.org/DockSec/)
+- **OWASP Slack**: [#project-docksec](https://owasp.slack.com/archives/C0APXGCUW7M)
 - **PyPI**: [pypi.org/project/docksec/](https://pypi.org/project/docksec/)
 - **Issues**: [Report a bug](https://github.com/OWASP/DockSec/issues)
 
