@@ -65,6 +65,20 @@ For questions or discussions, please join the [#project-docksec](https://owasp.s
 
 ## Quick Start
 
+### GitHub Action
+
+Integrate DockSec into your GitHub Actions workflow:
+
+```yaml
+- name: Run DockSec AI Scanner
+  uses: OWASP/DockSec@main
+  with:
+    dockerfile: 'Dockerfile'
+    openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+```
+
+### CLI Usage
+
 ```bash
 # Install DockSec
 pip install docksec
@@ -86,6 +100,7 @@ docksec Dockerfile -i myapp:latest
 - **Security Scoring**: Get a 0-100 score to track your security posture over time.
 - **Rich Reporting**: Professional exports in HTML (interactive), PDF, JSON, and CSV.
 - **CI/CD Ready**: Designed for easy integration into GitHub Actions and build pipelines.
+- **GitHub Action**: Available on the GitHub Marketplace for automated security scans.
 
 ---
 

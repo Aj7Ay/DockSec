@@ -1,0 +1,62 @@
+name: 'DockSec AI Scanner'
+description: 'AI-powered Docker security scanner that explains vulnerabilities in plain English.'
+author: 'Advait Patel'
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  dockerfile:
+    description: 'Path to the Dockerfile to analyze'
+    required: false
+    default: 'Dockerfile'
+  image:
+    description: 'Docker image name to scan'
+    required: false
+  output:
+    description: 'Custom output file path'
+    required: false
+  openai_api_key:
+    description: 'OpenAI API Key for AI analysis'
+    required: false
+  anthropic_api_key:
+    description: 'Anthropic API Key for AI analysis'
+    required: false
+  google_api_key:
+    description: 'Google API Key for AI analysis'
+    required: false
+  llm_provider:
+    description: 'LLM provider (openai, anthropic, google, ollama)'
+    required: false
+    default: 'openai'
+  llm_model:
+    description: 'Specific model name to use'
+    required: false
+  ai_only:
+    description: 'Run AI analysis only'
+    required: false
+    default: 'false'
+  scan_only:
+    description: 'Run security scanners only (no AI)'
+    required: false
+    default: 'false'
+  image_only:
+    description: 'Scan image without Dockerfile analysis'
+    required: false
+    default: 'false'
+
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  env:
+    INPUT_DOCKERFILE: ${{ inputs.dockerfile }}
+    INPUT_IMAGE: ${{ inputs.image }}
+    INPUT_OUTPUT: ${{ inputs.output }}
+    INPUT_OPENAI_API_KEY: ${{ inputs.openai_api_key }}
+    INPUT_ANTHROPIC_API_KEY: ${{ inputs.anthropic_api_key }}
+    INPUT_GOOGLE_API_KEY: ${{ inputs.google_api_key }}
+    INPUT_LLM_PROVIDER: ${{ inputs.llm_provider }}
+    INPUT_LLM_MODEL: ${{ inputs.llm_model }}
+    INPUT_AI_ONLY: ${{ inputs.ai_only }}
+    INPUT_SCAN_ONLY: ${{ inputs.scan_only }}
+    INPUT_IMAGE_ONLY: ${{ inputs.image_only }}

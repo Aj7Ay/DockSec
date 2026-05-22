@@ -31,6 +31,20 @@ python -m docksec.setup_external_tools
 
 ## Basic Usage
 
+### GitHub Action
+
+Integrate DockSec into your GitHub Actions workflow:
+
+```yaml
+- name: Run DockSec AI Scanner
+  uses: OWASP/DockSec@main
+  with:
+    dockerfile: 'Dockerfile'
+    openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+```
+
+### CLI Usage
+
 ### 1. Scan a Dockerfile
 Analyze a Dockerfile for security best practices and common misconfigurations.
 

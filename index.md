@@ -82,6 +82,7 @@ DockSec follows a robust four-stage pipeline:
 - **Security Scoring**: Get a 0-100 score to track your security posture over time.
 - **Rich Reporting**: Professional exports in HTML (interactive), PDF, JSON, and CSV.
 - **CI/CD Ready**: Designed for easy integration into GitHub Actions and build pipelines.
+- **GitHub Action**: Available on the GitHub Marketplace for automated security scans.
 
 ---
 
