@@ -25,6 +25,15 @@ tags: docksec
             <a href="mailto:advait.patel@owasp.org"><img src="https://img.shields.io/badge/Email-D14836?style=for-the-badge&logo=gmail&logoColor=white" alt="Email"></a>
         </div>
     </div>
+    <div class="leader-profile">
+        <img src="https://github.com/arkid15r.png" alt="Arkadii Yakovets" class="leader-image">
+        <h3>Arkadii Yakovets - Project Co-lead</h3>
+
+        <div class="social-links">
+            <a href="https://www.linkedin.com/in/arkid15r/" target="_blank"><img src="https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn"></a>
+            <a href="mailto:Arkadii.Yakovets@owasp.org"><img src="https://img.shields.io/badge/Email-D14836?style=for-the-badge&logo=gmail&logoColor=white" alt="Email"></a>
+        </div>
+    </div>
 </div>
 
 <style>
