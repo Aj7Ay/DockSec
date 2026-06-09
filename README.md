@@ -61,6 +61,7 @@ DockSec follows a robust four-stage pipeline:
 DockSec is led by a dedicated team committed to making container security accessible.
 
 - [Advait Patel](https://github.com/advaitpatel) - Project Lead
+- [Arkadii Yakovets](https://github.com/arkid15r) - Project Co-lead 
 
 For questions or discussions, please join the [#project-docksec](https://owasp.slack.com/archives/C0APXGCUW7M) channel on OWASP Slack.
 
