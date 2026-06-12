@@ -1,24 +1,63 @@
-name: Publish to PyPI
+name: Release DockSec
 
 on:
-  push:
-    tags:
-      - 'v*.*.*'  # Triggers on version tags like v0.0.21, v1.0.0, etc.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 2026.5.22.4)'
+        required: true
+        type: string
 
 jobs:
-  publish:
+  update-version:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      packages: write
+    outputs:
+      version: ${{ steps.set_version.outputs.VERSION }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set version output
+        id: set_version
+        run: echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+
+      - name: Update setup.py version
+        run: |
+          sed -i 's/version=".*"/version="${{ github.event.inputs.version }}"/' setup.py
+          
+      - name: Commit and push version update
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add setup.py
+          # Only commit if there are changes
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: bump version to ${{ github.event.inputs.version }}" && git push)
+
+      - name: Create and push tag
+        run: |
+          git tag v${{ github.event.inputs.version }}
+          git push origin v${{ github.event.inputs.version }}
+
+  publish-pypi:
+    needs: update-version
+    runs-on: ubuntu-latest
+    environment: pypi-release
+    permissions:
+      contents: read
       id-token: write
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v4
+      with:
+        ref: v${{ needs.update-version.outputs.version }}
     
     - name: Set up Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v5
       with:
         python-version: '3.12'
     
@@ -27,45 +66,45 @@ jobs:
         python -m pip install --upgrade pip
         pip install build twine
     
-    - name: Extract version from tag
-      id: get_version
-      run: |
-        # Get the tag name (e.g., v0.0.21)
-        TAG=${GITHUB_REF#refs/tags/v}
-        echo "VERSION=$TAG" >> $GITHUB_OUTPUT
-        echo "Publishing version: $TAG"
-    
-    - name: Verify version matches setup.py
-      run: |
-        SETUP_VERSION=$(python -c "import re; content=open('setup.py').read(); print(re.search(r'version=\"([^\"]+)\"', content).group(1))")
-        TAG_VERSION="${{ steps.get_version.outputs.VERSION }}"
-        echo "setup.py version: $SETUP_VERSION"
-        echo "Git tag version: $TAG_VERSION"
-        if [ "$SETUP_VERSION" != "$TAG_VERSION" ]; then
-          echo "ERROR: Version mismatch!"
-          echo "setup.py has version $SETUP_VERSION but git tag is v$TAG_VERSION"
-          exit 1
-        fi
-        echo "✅ Versions match!"
-    
     - name: Build package
       run: python -m build
     
-    - name: Check distribution files
-      run: |
-        ls -lh dist/
-        twine check dist/*
-    
     - name: Publish to PyPI
-      env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-      run: |
-        twine upload dist/*
-    
-    - name: Create GitHub Release
-      uses: softprops/action-gh-release@v3
+      uses: pypa/gh-action-pypi-publish@release/v1
       with:
+        password: ${{ secrets.PYPI_API_TOKEN }}
+
+  publish-github-release:
+    needs: [update-version, publish-pypi]
+    runs-on: ubuntu-latest
+    environment: marketplace-release
+    permissions:
+      contents: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        ref: v${{ needs.update-version.outputs.version }}
+        
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build
+        
+    - name: Build package
+      run: python -m build
+        
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v${{ needs.update-version.outputs.version }}
+        name: Release v${{ needs.update-version.outputs.version }}
         generate_release_notes: true
         files: |
           dist/*.tar.gz
