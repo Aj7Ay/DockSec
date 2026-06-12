@@ -1,8 +1,5 @@
 import pytest
-import os
-from pathlib import Path
 from docksec.compose_scanner import ComposeScanner, ComposeOrchestrator
-from docksec.enums import Severity
 
 @pytest.fixture
 def valid_compose_file(tmp_path):
