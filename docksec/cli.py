@@ -105,7 +105,6 @@ def main() -> None:
     if args.compose:
         run_ai = not args.scan_only
         run_scan = True
-        run_dockerfile_analysis = False
         run_compose_analysis = True
         mode_desc = "Compose Analysis"
         
@@ -128,26 +127,22 @@ def main() -> None:
     elif args.image_only:
         run_ai = False
         run_scan = True
-        run_dockerfile_analysis = False
         run_compose_analysis = False
         mode_desc = "Image-only Scan"
     elif args.ai_only:
         run_ai = True
         run_scan = False
-        run_dockerfile_analysis = True
         run_compose_analysis = False
         mode_desc = "AI Analysis Only"
     elif args.scan_only:
         run_ai = False
         run_scan = True
-        run_dockerfile_analysis = True
         run_compose_analysis = False
         mode_desc = "Security Scan Only"
     else:
         # Default: run both AI and scan if both Dockerfile and image are provided
         run_ai = bool(args.dockerfile)
         run_scan = bool(args.image)
-        run_dockerfile_analysis = bool(args.dockerfile)
         run_compose_analysis = False
         mode_desc = "Full Analysis (AI + Scanner)"
     
@@ -239,7 +234,7 @@ def main() -> None:
                 scanner.dockerfile_path = args.compose
             else:
                 # Initialize the scanner
-                dockerfile_path = args.dockerfile if run_dockerfile_analysis else None
+                dockerfile_path = None if args.image_only else args.dockerfile
                 scanner = DockerSecurityScanner(
                     dockerfile_path, 
                     args.image, 
