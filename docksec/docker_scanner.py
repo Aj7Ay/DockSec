@@ -1,72 +1,76 @@
-import os
-import json
-import subprocess
 import csv
 import hashlib
-from typing import List, Tuple, Dict, Optional
-from datetime import datetime
-from fpdf import FPDF
-import sys
+import json
+import os
 import re
+import subprocess
+import sys
+from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
+from fpdf import FPDF
+
 from docksec.config import RESULTS_DIR, docker_score_prompt
 from docksec.enums import Severity
-from docksec.utils import ScoreResponse, get_llm, print_section, get_custom_logger
-from collections import defaultdict
+from docksec.utils import ScoreResponse, get_custom_logger, get_llm, print_section
 
 # Initialize logger
 logger = get_custom_logger(__name__)
 
+
 class ScanResultsCache:
     """Simple cache for scan results to avoid re-scanning same images."""
-    
+
     def __init__(self, cache_dir: str = RESULTS_DIR):
         self.cache_file = os.path.join(cache_dir, ".docksec_cache.json")
         self.cache = self._load_cache()
-    
+
     def _load_cache(self) -> Dict:
         """Load cache from disk."""
         if os.path.exists(self.cache_file):
             try:
-                with open(self.cache_file, 'r') as f:
+                with open(self.cache_file, "r") as f:
                     return json.load(f)
             except (json.JSONDecodeError, IOError):
                 return {}
         return {}
-    
+
     def _save_cache(self) -> None:
         """Save cache to disk."""
         try:
-            with open(self.cache_file, 'w') as f:
+            with open(self.cache_file, "w") as f:
                 json.dump(self.cache, f, indent=2)
         except IOError as e:
             logger.warning(f"Failed to save cache: {e}")
-    
+
     def get_key(self, image_name: str) -> str:
         """Generate cache key from image name."""
         return hashlib.md5(image_name.encode()).hexdigest()
-    
+
     def get(self, image_name: str) -> Optional[Dict]:
         """Get cached results for an image."""
         key = self.get_key(image_name)
         return self.cache.get(key)
-    
+
     def set(self, image_name: str, results: Dict) -> None:
         """Cache scan results for an image."""
         key = self.get_key(image_name)
         self.cache[key] = {
             "image": image_name,
             "timestamp": datetime.now().isoformat(),
-            "results": results
+            "results": results,
         }
         self._save_cache()
-    
+
     def clear_old(self, days: int = 7) -> None:
         """Clear cache entries older than specified days."""
         from datetime import timedelta
+
         cutoff = datetime.now() - timedelta(days=days)
         keys_to_delete = []
-        
+
         for key, entry in self.cache.items():
             try:
                 entry_time = datetime.fromisoformat(entry.get("timestamp", ""))
@@ -74,32 +78,33 @@ class ScanResultsCache:
                     keys_to_delete.append(key)
             except (ValueError, TypeError):
                 keys_to_delete.append(key)
-        
+
         for key in keys_to_delete:
             del self.cache[key]
-        
+
         if keys_to_delete:
             self._save_cache()
             logger.info(f"Cleared {len(keys_to_delete)} old cache entries")
+
 
 class DockerSecurityScanner:
     @property
     def _cache_key(self) -> str:
         """Cache key incorporating image name and scanner mode to prevent cross-scanner hits."""
-        scanner_mode = getattr(self, 'scanner', 'trivy')
+        scanner_mode = getattr(self, "scanner", "trivy")
         return f"{self.image_name}[{scanner_mode}]"
 
     @staticmethod
     def _validate_file_path(file_path: str) -> Path:
         """
         Validate and sanitize file path to prevent path traversal attacks.
-        
+
         Args:
             file_path: Path to validate
-            
+
         Returns:
             Path object if valid
-            
+
         Raises:
             ValueError: If path is invalid or contains path traversal attempts
         """
@@ -108,7 +113,7 @@ class DockerSecurityScanner:
 
         # Check the raw string before resolution — Path.resolve() removes '..'
         # so checking the resolved path would silently allow traversal attempts.
-        if '..' in file_path:
+        if ".." in file_path:
             raise ValueError(f"Invalid path: path traversal detected in '{file_path}'")
 
         try:
@@ -116,67 +121,75 @@ class DockerSecurityScanner:
             return path
         except (OSError, ValueError) as e:
             raise ValueError(f"Invalid file path '{file_path}': {str(e)}")
-    
+
     @staticmethod
     def _validate_image_name(image_name: str) -> str:
         """
         Validate Docker image name format.
-        
+
         Args:
             image_name: Docker image name to validate
-            
+
         Returns:
             Sanitized image name
-            
+
         Raises:
             ValueError: If image name is invalid
         """
         if not image_name:
             raise ValueError("Image name cannot be empty")
-        
+
         # Basic validation - image names should be alphanumeric with :, /, -, _, .
         # More lenient than strict Docker validation, but prevents obvious injection
         if len(image_name) > 512:  # Docker image name max length
-            raise ValueError(f"Image name too long (max 512 characters): {len(image_name)}")
-        
+            raise ValueError(
+                f"Image name too long (max 512 characters): {len(image_name)}"
+            )
+
         # Check for path traversal attempts
-        if '..' in image_name or image_name.startswith('/'):
-            raise ValueError(f"Image name contains path traversal or absolute path: '{image_name}'")
-        
+        if ".." in image_name or image_name.startswith("/"):
+            raise ValueError(
+                f"Image name contains path traversal or absolute path: '{image_name}'"
+            )
+
         # Whitelist: Docker image names allow alphanumeric, '/', ':', '-', '_', '.', '@'
         # Anything outside this set (spaces, shell metacharacters, etc.) is rejected.
-        if not re.match(r'^[a-zA-Z0-9/:._\-@]+$', image_name):
+        if not re.match(r"^[a-zA-Z0-9/:._\-@]+$", image_name):
             raise ValueError(f"Image name contains invalid characters: '{image_name}'")
-        
+
         return image_name.strip()
-    
+
     @staticmethod
     def _validate_severity(severity: str) -> str:
         """
         Validate severity string for Trivy.
-        
+
         Args:
             severity: Comma-separated severity levels
-            
+
         Returns:
             Validated severity string
-            
+
         Raises:
             ValueError: If severity contains invalid values
         """
         if not severity:
             raise ValueError("Severity cannot be empty")
-        
+
         valid_severities = Severity.values()
-        severity_list = [s.strip().upper() for s in severity.split(',')]
+        severity_list = [s.strip().upper() for s in severity.split(",")]
 
         for sev in severity_list:
             if sev not in valid_severities:
-                raise ValueError(f"Invalid severity level: {sev}. Valid values: {', '.join(valid_severities)}")
-        
-        return ','.join(severity_list)
-    
-    def _print_compact_vulnerability_summary(self, vulnerabilities: List[Dict], label: str = "") -> None:
+                raise ValueError(
+                    f"Invalid severity level: {sev}. Valid values: {', '.join(valid_severities)}"
+                )
+
+        return ",".join(severity_list)
+
+    def _print_compact_vulnerability_summary(
+        self, vulnerabilities: List[Dict], label: str = ""
+    ) -> None:
         """
         Print a compact summary of vulnerabilities without full details.
         Shows count by severity in a single-line format.
@@ -192,12 +205,17 @@ class DockerSecurityScanner:
 
         severity_counts = defaultdict(int)
         for vuln in vulnerabilities:
-            severity = vuln.get('Severity', Severity.UNKNOWN)
+            severity = vuln.get("Severity", Severity.UNKNOWN)
             severity_counts[severity] += 1
 
         # Print compact single-line summary
         total = sum(severity_counts.values())
-        severity_order = [Severity.CRITICAL, Severity.HIGH, Severity.MEDIUM, Severity.LOW]
+        severity_order = [
+            Severity.CRITICAL,
+            Severity.HIGH,
+            Severity.MEDIUM,
+            Severity.LOW,
+        ]
         summary_parts = []
 
         for severity in severity_order:
@@ -205,19 +223,35 @@ class DockerSecurityScanner:
             if count > 0:
                 summary_parts.append(f"{severity}: {count}")
 
-        print(f"  {prefix}[VULNERABILITIES] {' | '.join(summary_parts)} | Total: {total}")
-        
+        print(
+            f"  {prefix}[VULNERABILITIES] {' | '.join(summary_parts)} | Total: {total}"
+        )
+
         # Show top 3 critical/high only
-        critical_high = [v for v in vulnerabilities if v.get('Severity') in [Severity.CRITICAL, Severity.HIGH]]
+        critical_high = [
+            v
+            for v in vulnerabilities
+            if v.get("Severity") in [Severity.CRITICAL, Severity.HIGH]
+        ]
         if critical_high:
             print("  Top Issues:")
             for i, vuln in enumerate(critical_high[:3], 1):
-                title = vuln.get('Title', 'N/A')
+                title = vuln.get("Title", "N/A")
                 if title and len(title) > 60:
                     title = title[:57] + "..."
-                print(f"    • [{vuln.get('Severity')}] {vuln.get('VulnerabilityID', 'N/A')}: {title}")
-    
-    def __init__(self, dockerfile_path: Optional[str], image_name: Optional[str], results_dir: str = RESULTS_DIR, scan_only: bool = False, skip_ai_scoring: bool = False, scanner: str = "trivy"):
+                print(
+                    f"    • [{vuln.get('Severity')}] {vuln.get('VulnerabilityID', 'N/A')}: {title}"
+                )
+
+    def __init__(
+        self,
+        dockerfile_path: Optional[str],
+        image_name: Optional[str],
+        results_dir: str = RESULTS_DIR,
+        scan_only: bool = False,
+        skip_ai_scoring: bool = False,
+        scanner: str = "trivy",
+    ):
         """
         Initialize the Docker Security Scanner with a Dockerfile path and/or image name.
         Verifies that required tools are installed and the specified files exist.
@@ -243,49 +277,60 @@ class DockerSecurityScanner:
         # Validate scanner choice
         valid_scanners = ("trivy", "grype", "all")
         if scanner not in valid_scanners:
-            raise ValueError(f"Invalid scanner: '{scanner}'. Valid options: {valid_scanners}")
+            raise ValueError(
+                f"Invalid scanner: '{scanner}'. Valid options: {valid_scanners}"
+            )
         self.scanner = scanner
 
-        self.required_tools = ['trivy']
+        self.required_tools = ["trivy"]
         if self.image_name:
-            self.required_tools.append('docker')
+            self.required_tools.append("docker")
         if self.dockerfile_path:
-            self.required_tools.append('hadolint')
+            self.required_tools.append("hadolint")
 
         self.RESULTS_DIR = results_dir
         self.scan_only = scan_only
         self.skip_ai_scoring = skip_ai_scoring
-        self.analysis_score = None  # Initialize to avoid AttributeError when accessed before calculation
-        
+        self.analysis_score = (
+            None  # Initialize to avoid AttributeError when accessed before calculation
+        )
+
         # Initialize score chain: skip if scan_only or skip_ai_scoring flags are set
         if scan_only or skip_ai_scoring:
             self.score_chain = None
         else:
             try:
-                from docksec.enums import LLMProvider
                 from docksec.config_manager import get_config
+                from docksec.enums import LLMProvider
+
                 config = get_config()
                 provider = config.llm_provider
                 llm = get_llm()
-                
+
                 if provider == LLMProvider.OPENAI:
-                    self.score_chain = docker_score_prompt | llm.with_structured_output(ScoreResponse, method="json_mode")
+                    self.score_chain = docker_score_prompt | llm.with_structured_output(
+                        ScoreResponse, method="json_mode"
+                    )
                 else:
-                    self.score_chain = docker_score_prompt | llm.with_structured_output(ScoreResponse)
+                    self.score_chain = docker_score_prompt | llm.with_structured_output(
+                        ScoreResponse
+                    )
             except Exception as e:
                 logger.warning(f"Failed to initialize AI scoring: {e}")
                 self.score_chain = None
-        
+
         # Ensure results directory exists
         try:
             os.makedirs(self.RESULTS_DIR, exist_ok=True)
         except Exception as e:
             logger.error(f"Failed to create results directory {self.RESULTS_DIR}: {e}")
             # Fallback is handled in config.py, but this is a safety check
-        
+
         # Initialize output mode for console display
-        self.compact_output = os.getenv("DOCKSEC_COMPACT_OUTPUT", "false").lower() == "true"
-        
+        self.compact_output = (
+            os.getenv("DOCKSEC_COMPACT_OUTPUT", "false").lower() == "true"
+        )
+
         # Initialize cache
         self.cache = ScanResultsCache(self.RESULTS_DIR)
         self.use_cache = os.getenv("DOCKSEC_USE_CACHE", "true").lower() == "true"
@@ -307,40 +352,53 @@ class DockerSecurityScanner:
                     capture_output=True,
                     check=True,
                     timeout=10,
-                    shell=False
+                    shell=False,
                 )
                 self._grype_available = True
-            except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+            except (
+                subprocess.CalledProcessError,
+                FileNotFoundError,
+                subprocess.TimeoutExpired,
+            ):
                 self._grype_available = False
                 if self.scanner == "grype":
                     print("[WARNING] Grype not found. Falling back to Trivy.")
-                    print("[TIP] Install Grype: run docksec-setup or visit https://github.com/anchore/grype")
+                    print(
+                        "[TIP] Install Grype: run docksec-setup or visit https://github.com/anchore/grype"
+                    )
                     self.scanner = "trivy"
                 else:
-                    print("[WARNING] Grype not found. Using Trivy only for --scanner all.")
-                    print("[TIP] Install Grype: run docksec-setup or visit https://github.com/anchore/grype")
+                    print(
+                        "[WARNING] Grype not found. Using Trivy only for --scanner all."
+                    )
+                    print(
+                        "[TIP] Install Grype: run docksec-setup or visit https://github.com/anchore/grype"
+                    )
         else:
             self._grype_available = False
 
         # Verify Dockerfile exists (after validation)
         if self.dockerfile_path and not os.path.exists(self.dockerfile_path):
             raise ValueError(f"Dockerfile not found at {self.dockerfile_path}")
-        
+
         # Verify Docker image exists (using validated image_name) if provided
         if self.image_name:
             try:
                 subprocess.run(
-                    ['docker', 'image', 'inspect', self.image_name],
+                    ["docker", "image", "inspect", self.image_name],
                     capture_output=True,
                     check=True,
                     text=True,
                     timeout=30,
-                    shell=False  # Explicitly disable shell for security
+                    shell=False,  # Explicitly disable shell for security
                 )
             except subprocess.CalledProcessError as e:
                 # Check if the error is due to permission issues
                 error_output = e.stderr.lower() if e.stderr else ""
-                if "permission denied" in error_output or "cannot connect to the docker daemon" in error_output:
+                if (
+                    "permission denied" in error_output
+                    or "cannot connect to the docker daemon" in error_output
+                ):
                     raise ValueError(
                         f"Unable to access Docker. This may require elevated permissions.\n"
                         f"Possible solutions:\n"
@@ -355,13 +413,14 @@ class DockerSecurityScanner:
                 raise ValueError(
                     "Docker command not found. Please ensure Docker is installed and accessible in your PATH."
                 )
+
     def run_image_only_scan(self, severity: str = "CRITICAL,HIGH") -> Dict:
         """
         Run image-only security scan without Dockerfile analysis.
-        
+
         Args:
             severity: Comma-separated list of severity levels to scan for
-            
+
         Returns:
             Dictionary containing scan results
         """
@@ -369,56 +428,61 @@ class DockerSecurityScanner:
         if self.use_cache:
             cached = self.cache.get(self._cache_key)
             if cached:
-                print(f"[INFO] Using cached scan results for {self.image_name} (scanned at {cached.get('timestamp', 'N/A')})")
-                print("[TIP] To bypass cache, set environment variable DOCKSEC_USE_CACHE=false")
-                return cached.get('results', {})
-        
+                print(
+                    f"[INFO] Using cached scan results for {self.image_name} (scanned at {cached.get('timestamp', 'N/A')})"
+                )
+                print(
+                    "[TIP] To bypass cache, set environment variable DOCKSEC_USE_CACHE=false"
+                )
+                return cached.get("results", {})
+
         # Validate severity input
         severity = self._validate_severity(severity)
         logger.info(f"Starting image-only scan for {self.image_name}")
-        
+
         results = {
-            'dockerfile_scan': {
-                'success': True,  # Skip Dockerfile scan
-                'output': "Skipped - Image-only scan mode",
-                'skipped': True
+            "dockerfile_scan": {
+                "success": True,  # Skip Dockerfile scan
+                "output": "Skipped - Image-only scan mode",
+                "skipped": True,
             },
-            'image_scan': {
-                'success': False,
-                'output': None
-            },
-            'json_data': [],
-            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            'image_name': self.image_name,
-            'dockerfile_path': self.dockerfile_path or "N/A - Image-only scan",
-            'scan_mode': 'image_only'
+            "image_scan": {"success": False, "output": None},
+            "json_data": [],
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "image_name": self.image_name,
+            "dockerfile_path": self.dockerfile_path or "N/A - Image-only scan",
+            "scan_mode": "image_only",
         }
 
-        scanner_mode = getattr(self, 'scanner', 'trivy')
+        scanner_mode = getattr(self, "scanner", "trivy")
         trivy_data: List[Dict] = []
         grype_data: List[Dict] = []
 
         if scanner_mode in ("trivy", "all"):
             image_success, image_output = self.scan_image(severity)
-            results['image_scan']['success'] = image_success
-            results['image_scan']['output'] = image_output
+            results["image_scan"]["success"] = image_success
+            results["image_scan"]["output"] = image_output
             trivy_success, trivy_data = self.scan_image_json(severity)
             trivy_data = trivy_data or []
 
-        if scanner_mode in ("grype", "all") and getattr(self, '_grype_available', False):
+        if scanner_mode in ("grype", "all") and getattr(
+            self, "_grype_available", False
+        ):
             grype_success, grype_data = self.scan_image_grype(severity)
             grype_data = grype_data or []
             if scanner_mode == "grype":
-                results['image_scan']['success'] = grype_success
+                results["image_scan"]["success"] = grype_success
 
         if scanner_mode == "trivy":
-            results['json_data'] = trivy_data
+            results["json_data"] = trivy_data
         elif scanner_mode == "grype":
-            results['json_data'] = grype_data
+            results["json_data"] = grype_data
         else:  # "all"
-            results['json_data'] = self._deduplicate_vulnerabilities(trivy_data, grype_data)
+            results["json_data"] = self._deduplicate_vulnerabilities(
+                trivy_data, grype_data
+            )
 
-        json_data = results['json_data']
+        json_data = results["json_data"]
 
         # Cache results
         if self.use_cache:
@@ -426,66 +490,76 @@ class DockerSecurityScanner:
 
         # Print final summary
         if not json_data:
-            print(f"[SUCCESS] Image scan completed for {self.image_name} (no vulnerabilities found).")
+            print(
+                f"[SUCCESS] Image scan completed for {self.image_name} (no vulnerabilities found)."
+            )
         else:
-            print(f"[INFO] Image scan completed for {self.image_name}. Found {len(json_data)} vulnerabilities.")
+            print(
+                f"[INFO] Image scan completed for {self.image_name}. Found {len(json_data)} vulnerabilities."
+            )
 
-        return results 
-          
+        return results
+
     def _check_tools(self) -> List[str]:
         """Check if all required tools are installed and return list of missing tools."""
         missing_tools = []
-        
+
         for tool in self.required_tools:
             try:
                 subprocess.run(
-                    [tool, '--version'],
+                    [tool, "--version"],
                     capture_output=True,
                     check=True,
                     timeout=10,
-                    shell=False
+                    shell=False,
                 )
-            except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+            except (
+                subprocess.CalledProcessError,
+                FileNotFoundError,
+                subprocess.TimeoutExpired,
+            ):
                 missing_tools.append(tool)
-        
+
         return missing_tools
-    
+
     def _get_tool_installation_instructions(self, tool: str) -> str:
         """Get installation instructions for a missing tool."""
         instructions = {
-            'docker': (
+            "docker": (
                 "Docker is required for image scanning. Please install Docker:\n"
                 "  - Linux: https://docs.docker.com/engine/install/\n"
                 "  - macOS: https://docs.docker.com/desktop/install/mac-install/\n"
                 "  - Windows: https://docs.docker.com/desktop/install/windows-install/"
             ),
-            'trivy': (
+            "trivy": (
                 "Trivy is required for vulnerability scanning. Install it:\n"
                 "  - Linux/Mac: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin\n"
                 "  - Windows: See https://aquasecurity.github.io/trivy/latest/getting-started/installation/\n"
                 "  - Or run: python setup_external_tools.py"
             ),
-            'hadolint': (
+            "hadolint": (
                 "Hadolint is required for Dockerfile linting. Install it:\n"
                 "  - Linux: curl -L -o hadolint https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64 && chmod +x hadolint && sudo mv hadolint /usr/local/bin/\n"
                 "  - macOS: brew install hadolint\n"
                 "  - Windows: See https://github.com/hadolint/hadolint#install\n"
                 "  - Or run: python setup_external_tools.py"
             ),
-            'grype': (
+            "grype": (
                 "Grype is an optional vulnerability scanner (complements Trivy). Install it:\n"
                 "  - Linux/Mac: curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin\n"
                 "  - macOS: brew install anchore/grype/grype\n"
                 "  - Windows: See https://github.com/anchore/grype#installation\n"
                 "  - Or run: python setup_external_tools.py"
-            )
+            ),
         }
-        return instructions.get(tool, f"Please install {tool} from its official documentation.")
+        return instructions.get(
+            tool, f"Please install {tool} from its official documentation."
+        )
 
     def scan_dockerfile(self) -> Tuple[bool, Optional[str]]:
         """
         Scan Dockerfile using Hadolint.
-        
+
         Returns:
             Tuple containing:
                 - bool: True if no issues found, False otherwise
@@ -495,26 +569,28 @@ class DockerSecurityScanner:
         print("\n=== Starting Dockerfile scan with Hadolint ===")
         try:
             result = subprocess.run(
-                ['hadolint', self.dockerfile_path],
+                ["hadolint", self.dockerfile_path],
                 capture_output=True,
                 text=True,
                 timeout=300,
-                shell=False
+                shell=False,
             )
-            
+
             if result.returncode != 0:
                 output = result.stdout if result.stdout else result.stderr
                 logger.warning(f"Hadolint found issues in {self.dockerfile_path}")
                 print("[WARNING] Dockerfile linting issues found:")
                 print(output)
                 print("\n[TIP] Run 'hadolint --help' to learn about specific rules")
-                print("   You can ignore specific rules with: hadolint --ignore DL3000 Dockerfile")
+                print(
+                    "   You can ignore specific rules with: hadolint --ignore DL3000 Dockerfile"
+                )
                 return False, output
             else:
                 logger.info("No Dockerfile linting issues found.")
                 print("[SUCCESS] No Dockerfile linting issues found.")
                 return True, None
-                
+
         except subprocess.CalledProcessError as e:
             error_msg = f"Hadolint execution failed: {e}"
             logger.error(error_msg, exc_info=True)
@@ -538,34 +614,34 @@ class DockerSecurityScanner:
             logger.error(error_msg)
             print(f"\n[ERROR] Error: {error_msg}")
             print("\nInstallation instructions:")
-            print(self._get_tool_installation_instructions('hadolint'))
+            print(self._get_tool_installation_instructions("hadolint"))
             return False, error_msg
         except Exception as e:
             error_msg = f"Unexpected error during Hadolint scan: {e}"
             logger.error(error_msg, exc_info=True)
             print(f"\n[ERROR] Error: {error_msg}")
             return False, str(e)
-    
+
     def _filter_scan_results(self, scan_results: Dict) -> List[Dict]:
         """
         Filter Trivy scan results to extract specific vulnerability data.
-        
+
         Args:
             scan_results: The raw Trivy scan results
-            
+
         Returns:
             List of filtered vulnerability data with key information
         """
         filtered_vulnerabilities = []
-        
+
         for result in scan_results.get("Results", []):
             target = result.get("Target", "")
-            
-            for vulnerability in result.get('Vulnerabilities', []):
+
+            for vulnerability in result.get("Vulnerabilities", []):
                 description = vulnerability.get("Description", "")
                 if description and len(description) > 150:
                     description = description[:150] + "..."
-                
+
                 filtered_vulnerability = {
                     "VulnerabilityID": vulnerability.get("VulnerabilityID"),
                     "Target": target,
@@ -576,14 +652,16 @@ class DockerSecurityScanner:
                     "Description": description,
                     "Status": vulnerability.get("Status"),
                     "CVSS": vulnerability.get("CVSS", {}).get("nvd", {}).get("V3Score"),
-                    "PrimaryURL": vulnerability.get("PrimaryURL")
+                    "PrimaryURL": vulnerability.get("PrimaryURL"),
                 }
-                
+
                 filtered_vulnerabilities.append(filtered_vulnerability)
-        
+
         return filtered_vulnerabilities
-    
-    def _parse_grype_output(self, json_output: str, severity_filter: Optional[set] = None) -> List[Dict]:
+
+    def _parse_grype_output(
+        self, json_output: str, severity_filter: Optional[set] = None
+    ) -> List[Dict]:
         """
         Normalize Grype JSON output to DockSec's internal vulnerability format.
 
@@ -617,7 +695,9 @@ class DockerSecurityScanner:
             # Derive a concise title: use first sentence of description (≤100 chars)
             if raw_desc:
                 first_sentence = raw_desc.split(".")[0].strip()
-                title = first_sentence[:100] + ("..." if len(first_sentence) > 100 else "")
+                title = first_sentence[:100] + (
+                    "..." if len(first_sentence) > 100 else ""
+                )
             else:
                 title = vuln.get("id", "")
 
@@ -641,25 +721,31 @@ class DockerSecurityScanner:
 
             # Use artifact locations for Target (mirrors Trivy's layer-level target)
             locations = artifact.get("locations", [])
-            target = locations[0].get("path", "") if locations else artifact.get("type", "")
+            target = (
+                locations[0].get("path", "") if locations else artifact.get("type", "")
+            )
 
-            filtered_vulnerabilities.append({
-                "VulnerabilityID": vuln.get("id"),
-                "Target": target,
-                "PkgName": artifact.get("name", ""),
-                "InstalledVersion": artifact.get("version", ""),
-                "Severity": severity,
-                "Title": title,
-                "Description": description,
-                "Status": status,
-                "CVSS": cvss_score,
-                "PrimaryURL": primary_url,
-                "sources": ["grype"],
-            })
+            filtered_vulnerabilities.append(
+                {
+                    "VulnerabilityID": vuln.get("id"),
+                    "Target": target,
+                    "PkgName": artifact.get("name", ""),
+                    "InstalledVersion": artifact.get("version", ""),
+                    "Severity": severity,
+                    "Title": title,
+                    "Description": description,
+                    "Status": status,
+                    "CVSS": cvss_score,
+                    "PrimaryURL": primary_url,
+                    "sources": ["grype"],
+                }
+            )
 
         return filtered_vulnerabilities
 
-    def _deduplicate_vulnerabilities(self, trivy_vulns: List[Dict], grype_vulns: List[Dict]) -> List[Dict]:
+    def _deduplicate_vulnerabilities(
+        self, trivy_vulns: List[Dict], grype_vulns: List[Dict]
+    ) -> List[Dict]:
         """
         Merge and deduplicate vulnerabilities from Trivy and Grype by CVE ID.
 
@@ -698,7 +784,9 @@ class DockerSecurityScanner:
 
         return list(seen.values())
 
-    def scan_image_grype(self, severity: str = "CRITICAL,HIGH") -> Tuple[bool, Optional[List[Dict]]]:
+    def scan_image_grype(
+        self, severity: str = "CRITICAL,HIGH"
+    ) -> Tuple[bool, Optional[List[Dict]]]:
         """
         Scan Docker image using Grype and return structured results.
 
@@ -708,7 +796,13 @@ class DockerSecurityScanner:
         Returns:
             Tuple of (success: bool, vulnerabilities: List[Dict] | None)
         """
-        from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
+        from rich.progress import (
+            BarColumn,
+            Progress,
+            SpinnerColumn,
+            TextColumn,
+            TimeElapsedColumn,
+        )
 
         severity = self._validate_severity(severity)
         severity_set = {s.strip().upper() for s in severity.split(",")}
@@ -731,7 +825,8 @@ class DockerSecurityScanner:
                     [
                         "grype",
                         self.image_name,
-                        "-o", "json",
+                        "-o",
+                        "json",
                     ],
                     capture_output=True,
                     text=True,
@@ -769,60 +864,69 @@ class DockerSecurityScanner:
             print(f"[ERROR] {error_msg}")
             return False, None
 
-    def scan_image_json(self, severity: str = "CRITICAL,HIGH") -> Tuple[bool, Optional[List[Dict]]]:
+    def scan_image_json(
+        self, severity: str = "CRITICAL,HIGH"
+    ) -> Tuple[bool, Optional[List[Dict]]]:
         """
         Scan Docker image using Trivy and return the results as structured data (compact).
-        
+
         Args:
             severity: Comma-separated list of severity levels to scan for
-            
+
         Returns:
             Tuple containing:
                 - bool: True if scan completed successfully, False otherwise
                 - Optional[List[Dict]]: Filtered vulnerability data or None if scan failed
         """
-        from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
-        
+        from rich.progress import (
+            BarColumn,
+            Progress,
+            SpinnerColumn,
+            TextColumn,
+            TimeElapsedColumn,
+        )
+
         # Validate severity input
         severity = self._validate_severity(severity)
         logger.info(f"Starting Trivy JSON scan for image: {self.image_name}")
-        
+
         try:
             with Progress(
                 SpinnerColumn(),
                 TextColumn("[progress.description]{task.description}"),
                 BarColumn(),
                 TimeElapsedColumn(),
-                console=None
+                console=None,
             ) as progress:
                 scan_task = progress.add_task(
-                    f"[cyan]Scanning {self.image_name}...",
-                    total=None
+                    f"[cyan]Scanning {self.image_name}...", total=None
                 )
-                
+
                 result = subprocess.run(
                     [
-                        'trivy',
-                        'image',
-                        '-f', 'json',
-                        '--severity', severity,
-                        '--no-progress',
-                        '--skip-version-check',
-                        self.image_name
+                        "trivy",
+                        "image",
+                        "-f",
+                        "json",
+                        "--severity",
+                        severity,
+                        "--no-progress",
+                        "--skip-version-check",
+                        self.image_name,
                     ],
                     capture_output=True,
                     text=True,
-                    encoding='utf-8',
+                    encoding="utf-8",
                     timeout=600,
-                    shell=False
+                    shell=False,
                 )
-                
+
                 progress.update(scan_task, completed=True)
-            
-            if result.stderr and 'error' in result.stderr.lower() and not result.stdout:
+
+            if result.stderr and "error" in result.stderr.lower() and not result.stdout:
                 print(f"[ERROR] Trivy scan failed: {result.stderr[:200]}")
                 return False, None
-            
+
             if not result.stdout:
                 return True, []
 
@@ -833,7 +937,7 @@ class DockerSecurityScanner:
             self._print_compact_vulnerability_summary(filtered_results, label="[Trivy]")
 
             return True, filtered_results
-            
+
         except subprocess.TimeoutExpired:
             error_msg = "Trivy scan timed out after 600 seconds"
             logger.error(error_msg)
@@ -853,10 +957,10 @@ class DockerSecurityScanner:
     def scan_image(self, severity: str = "CRITICAL,HIGH") -> Tuple[bool, Optional[str]]:
         """
         Scan Docker image using Trivy and return text output (compressed).
-        
+
         Args:
             severity: Comma-separated list of severity levels to scan for
-            
+
         Returns:
             Tuple containing:
                 - bool: True if no vulnerabilities found, False otherwise
@@ -864,30 +968,33 @@ class DockerSecurityScanner:
         """
         # Validate severity input
         severity = self._validate_severity(severity)
-        logger.info(f"Starting Trivy scan for image: {self.image_name} with severity: {severity}")
-        
+        logger.info(
+            f"Starting Trivy scan for image: {self.image_name} with severity: {severity}"
+        )
+
         try:
             result = subprocess.run(
                 [
-                    'trivy',
-                    'image',
-                    '--severity', severity,
-                    '--no-progress',
-                    '--skip-version-check',
-                    '--quiet',
-                    self.image_name
+                    "trivy",
+                    "image",
+                    "--severity",
+                    severity,
+                    "--no-progress",
+                    "--skip-version-check",
+                    "--quiet",
+                    self.image_name,
                 ],
                 capture_output=True,
                 text=True,
-                encoding='utf-8',
+                encoding="utf-8",
                 timeout=600,
-                shell=False
+                shell=False,
             )
-            
+
             # In compact mode, we mostly rely on scan_image_json for output
             # This method is kept for backward compatibility and full text results
             return result.returncode == 0, result.stdout
-            
+
         except subprocess.TimeoutExpired:
             print("[ERROR] Trivy scan timed out after 600 seconds")
             return False, "Scan timed out"
@@ -898,61 +1005,72 @@ class DockerSecurityScanner:
     def advanced_scan(self) -> Dict:
         """
         Run advanced Docker Scout scan and show a concise summary.
-        
+
         Returns:
             Dict containing scan results, or empty dict if scan failed
         """
-        result_dict = {
-            'success': False,
-            'output': None,
-            'error': None
-        }
-        
+        result_dict = {"success": False, "output": None, "error": None}
+
         try:
             # Running Docker Scout quick scan
             result = subprocess.run(
-                ["docker", "scout", "quickview", self.image_name], 
-                capture_output=True, text=True, check=True, timeout=300, shell=False
+                ["docker", "scout", "quickview", self.image_name],
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=300,
+                shell=False,
             )
-            
+
             # Parse and show concise summary
             output = result.stdout
             summary_lines = []
-            for line in output.split('\n'):
+            for line in output.split("\n"):
                 # Extract lines containing counts or recommendations
-                if any(x in line for x in ['Target', 'Base image', 'Updated base image', 'vulnerabilities']):
+                if any(
+                    x in line
+                    for x in [
+                        "Target",
+                        "Base image",
+                        "Updated base image",
+                        "vulnerabilities",
+                    ]
+                ):
                     summary_lines.append(line.strip())
-            
+
             print(f"  [ADVANCED] Docker Scout Summary for {self.image_name}:")
             if summary_lines:
-                for line in summary_lines[:5]: # Show top 5 summary lines
+                for line in summary_lines[:5]:  # Show top 5 summary lines
                     print(f"    {line}")
             else:
                 # Fallback to a very short version of output if parsing fails
-                print(f"    {output.splitlines()[0] if output.splitlines() else 'Scan completed.'}")
-            
-            result_dict['success'] = True
-            result_dict['output'] = result.stdout
+                print(
+                    f"    {output.splitlines()[0] if output.splitlines() else 'Scan completed.'}"
+                )
+
+            result_dict["success"] = True
+            result_dict["output"] = result.stdout
         except subprocess.CalledProcessError as e:
             error_msg = e.stderr if e.stderr else str(e)
             logger.warning(f"Docker Scout failed: {error_msg}")
-            result_dict['error'] = error_msg
+            result_dict["error"] = error_msg
         except subprocess.TimeoutExpired:
             error_msg = "Docker Scout scan timed out"
             logger.warning(error_msg)
-            result_dict['error'] = error_msg
+            result_dict["error"] = error_msg
         except FileNotFoundError:
             # Silently fail if tool not found, as it's optional
-            result_dict['error'] = "Docker Scout not found"
-        
+            result_dict["error"] = "Docker Scout not found"
+
         return result_dict
+
     def run_full_scan(self, severity: str = "CRITICAL,HIGH") -> Dict:
         """
         Run all security scans and return results.
-        
+
         Args:
             severity: Comma-separated list of severity levels to scan for
-            
+
         Returns:
             Dictionary containing scan results
         """
@@ -960,71 +1078,76 @@ class DockerSecurityScanner:
         if self.image_name and self.use_cache:
             cached = self.cache.get(self._cache_key)
             if cached:
-                print(f"[INFO] Using cached scan results for {self.image_name} (scanned at {cached.get('timestamp', 'N/A')})")
-                print("[TIP] To bypass cache, set environment variable DOCKSEC_USE_CACHE=false")
-                return cached.get('results', {})
-        
+                print(
+                    f"[INFO] Using cached scan results for {self.image_name} (scanned at {cached.get('timestamp', 'N/A')})"
+                )
+                print(
+                    "[TIP] To bypass cache, set environment variable DOCKSEC_USE_CACHE=false"
+                )
+                return cached.get("results", {})
+
         # Validate severity input
         severity = self._validate_severity(severity)
         scan_status = True
         results = {
-            'dockerfile_scan': {
-                'success': False,
-                'output': None
+            "dockerfile_scan": {"success": False, "output": None},
+            "image_scan": {
+                "success": True,  # Default to True if skipped
+                "output": "Skipped - No image provided",
+                "skipped": True,
             },
-            'image_scan': {
-                'success': True,  # Default to True if skipped
-                'output': "Skipped - No image provided",
-                'skipped': True
-            },
-            'json_data': [],
-            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            'image_name': self.image_name or "N/A",
-            'dockerfile_path': self.dockerfile_path
+            "json_data": [],
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "image_name": self.image_name or "N/A",
+            "dockerfile_path": self.dockerfile_path,
         }
 
         # Run Dockerfile scan
         if self.dockerfile_path:
             dockerfile_success, dockerfile_output = self.scan_dockerfile()
-            results['dockerfile_scan']['success'] = dockerfile_success
-            results['dockerfile_scan']['output'] = dockerfile_output
+            results["dockerfile_scan"]["success"] = dockerfile_success
+            results["dockerfile_scan"]["output"] = dockerfile_output
             if not dockerfile_success:
                 scan_status = False
         else:
-            results['dockerfile_scan']['success'] = True
-            results['dockerfile_scan']['output'] = "Skipped - No Dockerfile provided"
-            results['dockerfile_scan']['skipped'] = True
+            results["dockerfile_scan"]["success"] = True
+            results["dockerfile_scan"]["output"] = "Skipped - No Dockerfile provided"
+            results["dockerfile_scan"]["skipped"] = True
 
         # Run image vulnerability scan (only if image name is provided)
         if self.image_name:
-            scanner_mode = getattr(self, 'scanner', 'trivy')
+            scanner_mode = getattr(self, "scanner", "trivy")
             trivy_data: List[Dict] = []
             grype_data: List[Dict] = []
 
             if scanner_mode in ("trivy", "all"):
                 image_success, image_output = self.scan_image(severity)
-                results['image_scan']['success'] = image_success
-                results['image_scan']['output'] = image_output
-                results['image_scan']['skipped'] = False
+                results["image_scan"]["success"] = image_success
+                results["image_scan"]["output"] = image_output
+                results["image_scan"]["skipped"] = False
                 if not image_success:
                     scan_status = False
                 trivy_success, trivy_data = self.scan_image_json(severity)
                 trivy_data = trivy_data or []
 
-            if scanner_mode in ("grype", "all") and getattr(self, '_grype_available', False):
+            if scanner_mode in ("grype", "all") and getattr(
+                self, "_grype_available", False
+            ):
                 grype_success, grype_data = self.scan_image_grype(severity)
                 grype_data = grype_data or []
                 if not grype_success and scanner_mode == "grype":
                     scan_status = False
-                    results['image_scan']['skipped'] = False
+                    results["image_scan"]["skipped"] = False
 
             if scanner_mode == "trivy":
-                results['json_data'] = trivy_data
+                results["json_data"] = trivy_data
             elif scanner_mode == "grype":
-                results['image_scan']['skipped'] = False
-                results['json_data'] = grype_data
+                results["image_scan"]["skipped"] = False
+                results["json_data"] = grype_data
             else:  # "all"
-                results['json_data'] = self._deduplicate_vulnerabilities(trivy_data, grype_data)
+                results["json_data"] = self._deduplicate_vulnerabilities(
+                    trivy_data, grype_data
+                )
 
             # Cache results
             if self.use_cache:
@@ -1035,36 +1158,42 @@ class DockerSecurityScanner:
         if scan_status:
             print(f"[SUCCESS] All security scans completed for {target_name}.")
         else:
-            print(f"[WARNING] Security scans completed for {target_name} with some issues.")
+            print(
+                f"[WARNING] Security scans completed for {target_name} with some issues."
+            )
 
         return results
 
     def save_results_to_json(self, results: Dict) -> str:
         """
         Save scan results to a JSON file.
-        
+
         Args:
             results: The scan results to save
-            
+
         Returns:
             Path to the saved JSON file
         """
         # Sanitize image name for filename (avoid backslash in f-string expression)
         image_name_for_file = self.image_name or "docksec_report"
-        safe_image_name = re.sub(r'[:/.\-]', '_', image_name_for_file)
-        output_file = os.path.join(self.RESULTS_DIR, f"{safe_image_name}_scan_results.json")
+        safe_image_name = re.sub(r"[:/.\-]", "_", image_name_for_file)
+        output_file = os.path.join(
+            self.RESULTS_DIR, f"{safe_image_name}_scan_results.json"
+        )
 
-        json_results = results.get('json_data', [])
+        json_results = results.get("json_data", [])
         vulnerabilities = {
             "scan_info": {
                 "image": self.image_name or "N/A",
                 "dockerfile": self.dockerfile_path or "N/A",
-                "scan_time": results.get('timestamp', datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
-                "analysis score": self.analysis_score
+                "scan_time": results.get(
+                    "timestamp", datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                ),
+                "analysis score": self.analysis_score,
             },
-            "vulnerabilities": json_results
+            "vulnerabilities": json_results,
         }
-        
+
         try:
             with open(output_file, "w") as f:
                 json.dump(vulnerabilities, f, indent=4)
@@ -1076,32 +1205,44 @@ class DockerSecurityScanner:
     def save_results_to_csv(self, results: Dict) -> str:
         """
         Save vulnerability scan results to a CSV file.
-        
+
         Args:
             results: The scan results to save
-            
+
         Returns:
             Path to the saved CSV file
         """
         # Sanitize image name for filename
         image_name_for_file = self.image_name or "docksec_report"
-        safe_image_name = re.sub(r'[:/.\-]', '_', image_name_for_file)
-        output_file = os.path.join(self.RESULTS_DIR, f"{safe_image_name}_vulnerabilities.csv")
-        
-        vulnerabilities = results.get('json_data', [])
+        safe_image_name = re.sub(r"[:/.\-]", "_", image_name_for_file)
+        output_file = os.path.join(
+            self.RESULTS_DIR, f"{safe_image_name}_vulnerabilities.csv"
+        )
+
+        vulnerabilities = results.get("json_data", [])
         if not vulnerabilities:
             # Create an empty CSV with headers if no vulnerabilities found
-            logger.info("No vulnerability data to save to CSV, creating header-only file")
-        
+            logger.info(
+                "No vulnerability data to save to CSV, creating header-only file"
+            )
+
         try:
             # Define CSV columns
             fieldnames = [
-                "VulnerabilityID", "Severity", "PkgName", "InstalledVersion",
-                "Title", "Description", "CVSS", "Status", "Target", "PrimaryURL",
+                "VulnerabilityID",
+                "Severity",
+                "PkgName",
+                "InstalledVersion",
+                "Title",
+                "Description",
+                "CVSS",
+                "Status",
+                "Target",
+                "PrimaryURL",
                 "sources",
             ]
 
-            with open(output_file, 'w', newline='') as csvfile:
+            with open(output_file, "w", newline="") as csvfile:
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                 writer.writeheader()
 
@@ -1114,245 +1255,332 @@ class DockerSecurityScanner:
                             v = ",".join(str(x) for x in v)
                         filtered_vuln[k] = v
                     writer.writerow(filtered_vuln)
-                    
+
             return output_file
         except Exception as e:
             logger.error(f"Error saving results to CSV file: {e}")
             return ""
-    
+
     def save_results_to_pdf(self, results: Dict) -> str:
         """
         Save scan results to a PDF file with formatting.
         Handles both full scans and image-only scans.
-        
+
         Args:
             results: The scan results to save
-            
+
         Returns:
             Path to the saved PDF file
         """
         # Sanitize image name for filename
         image_name_for_file = self.image_name or "docksec_report"
-        safe_image_name = re.sub(r'[:/.\-]', '_', image_name_for_file)
-        output_file = os.path.join(self.RESULTS_DIR, f"{safe_image_name}_security_report.pdf")
-        
+        safe_image_name = re.sub(r"[:/.\-]", "_", image_name_for_file)
+        output_file = os.path.join(
+            self.RESULTS_DIR, f"{safe_image_name}_security_report.pdf"
+        )
+
         try:
             # Create custom PDF class with text wrapping capability
             from fpdf.enums import XPos, YPos
+
             class PDF(FPDF):
                 def __init__(self):
                     super().__init__()
                     self.set_auto_page_break(True, margin=15)
-                
+
                 def multi_cell_with_title(self, title, content, title_w=40):
                     """Create a title-content pair with the content potentially spanning multiple lines"""
-                    self.set_font('helvetica', 'B', 10)
+                    self.set_font("helvetica", "B", 10)
                     x_start = self.get_x()
                     y_start = self.get_y()
                     self.cell(title_w, 7, title)
-                    self.set_font('helvetica', '', 10)
-                    
+                    self.set_font("helvetica", "", 10)
+
                     # Calculate available width for content to avoid horizontal space errors
                     available_w = self.w - self.l_margin - self.r_margin - title_w
                     if available_w < 20:  # Minimum fallback width
                         available_w = 20
-                        
+
                     self.set_xy(x_start + title_w, y_start)
-                    self.multi_cell(available_w, 7, str(content), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                    self.multi_cell(
+                        available_w,
+                        7,
+                        str(content),
+                        new_x=XPos.LMARGIN,
+                        new_y=YPos.NEXT,
+                    )
                     self.ln(2)
-                
+
                 def add_section_header(self, title):
                     """Add a section header"""
-                    self.set_font('helvetica', 'B', 12)
+                    self.set_font("helvetica", "B", 12)
                     self.cell(0, 10, title, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
                     self.ln(2)
-            
+
             # Create PDF instance
             pdf = PDF()
             pdf.add_page()
-            
+
             # Add title
-            pdf.set_font('helvetica', 'B', 16)
-            scan_mode = results.get('scan_mode', 'full')
-            title = f'Docker Security Scan Report ({scan_mode.upper()})'
-            pdf.cell(0, 10, title, align='C', new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.set_font("helvetica", "B", 16)
+            scan_mode = results.get("scan_mode", "full")
+            title = f"Docker Security Scan Report ({scan_mode.upper()})"
+            pdf.cell(0, 10, title, align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
             pdf.ln(5)
-            
+
             # Add scan information section
-            pdf.add_section_header('Scan Information')
-            pdf.multi_cell_with_title('Image:', self.image_name or "N/A")
-            pdf.multi_cell_with_title('Scan Mode:', scan_mode.replace('_', ' ').title())
-            pdf.multi_cell_with_title('Dockerfile:', results.get('dockerfile_path', 'N/A'))
-            pdf.multi_cell_with_title('Scan Date:', results.get('timestamp', ''))
-            pdf.multi_cell_with_title('Analysis Score:', str(self.analysis_score))
+            pdf.add_section_header("Scan Information")
+            pdf.multi_cell_with_title("Image:", self.image_name or "N/A")
+            pdf.multi_cell_with_title("Scan Mode:", scan_mode.replace("_", " ").title())
+            pdf.multi_cell_with_title(
+                "Dockerfile:", results.get("dockerfile_path", "N/A")
+            )
+            pdf.multi_cell_with_title("Scan Date:", results.get("timestamp", ""))
+            pdf.multi_cell_with_title("Analysis Score:", str(self.analysis_score))
             pdf.ln(5)
-            
+
             # Add image information if available (for extended scans)
-            if 'image_info' in results:
-                pdf.add_section_header('Image Information')
-                image_info = results['image_info']
-                
-                if image_info.get('size'):
-                    size_mb = round(image_info['size'] / (1024*1024), 2)
-                    pdf.multi_cell_with_title('Size:', f"{size_mb} MB")
-                
-                if image_info.get('created'):
-                    pdf.multi_cell_with_title('Created:', image_info['created'][:19])  # Truncate timestamp
-                
-                if image_info.get('architecture'):
-                    pdf.multi_cell_with_title('Architecture:', image_info['architecture'])
-                
-                if image_info.get('os'):
-                    pdf.multi_cell_with_title('OS:', image_info['os'])
-                
+            if "image_info" in results:
+                pdf.add_section_header("Image Information")
+                image_info = results["image_info"]
+
+                if image_info.get("size"):
+                    size_mb = round(image_info["size"] / (1024 * 1024), 2)
+                    pdf.multi_cell_with_title("Size:", f"{size_mb} MB")
+
+                if image_info.get("created"):
+                    pdf.multi_cell_with_title(
+                        "Created:", image_info["created"][:19]
+                    )  # Truncate timestamp
+
+                if image_info.get("architecture"):
+                    pdf.multi_cell_with_title(
+                        "Architecture:", image_info["architecture"]
+                    )
+
+                if image_info.get("os"):
+                    pdf.multi_cell_with_title("OS:", image_info["os"])
+
                 pdf.ln(5)
-            
+
             # Add configuration analysis if available
-            if 'config_analysis' in results:
-                pdf.add_section_header('Configuration Analysis')
-                config_analysis = results['config_analysis']
-                
+            if "config_analysis" in results:
+                pdf.add_section_header("Configuration Analysis")
+                config_analysis = results["config_analysis"]
+
                 # Count issues
-                high_count = len(config_analysis.get('high_risk', []))
-                medium_count = len(config_analysis.get('medium_risk', []))
-                low_count = len(config_analysis.get('low_risk', []))
+                high_count = len(config_analysis.get("high_risk", []))
+                medium_count = len(config_analysis.get("medium_risk", []))
+                low_count = len(config_analysis.get("low_risk", []))
                 total_count = high_count + medium_count + low_count
-                
-                pdf.multi_cell_with_title('Total Issues:', str(total_count))
+
+                pdf.multi_cell_with_title("Total Issues:", str(total_count))
                 if high_count > 0:
-                    pdf.multi_cell_with_title('High Risk:', str(high_count))
+                    pdf.multi_cell_with_title("High Risk:", str(high_count))
                 if medium_count > 0:
-                    pdf.multi_cell_with_title('Medium Risk:', str(medium_count))
+                    pdf.multi_cell_with_title("Medium Risk:", str(medium_count))
                 if low_count > 0:
-                    pdf.multi_cell_with_title('Low Risk:', str(low_count))
-                
+                    pdf.multi_cell_with_title("Low Risk:", str(low_count))
+
                 # Add issue details
                 if high_count > 0:
                     pdf.ln(3)
-                    pdf.set_font('helvetica', 'B', 10)
-                    pdf.cell(0, 7, 'High-Risk Issues:', new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-                    pdf.set_font('helvetica', '', 9)
-                    for issue in config_analysis['high_risk']:
-                        pdf.multi_cell(0, 5, f"• {issue}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-                
+                    pdf.set_font("helvetica", "B", 10)
+                    pdf.cell(
+                        0, 7, "High-Risk Issues:", new_x=XPos.LMARGIN, new_y=YPos.NEXT
+                    )
+                    pdf.set_font("helvetica", "", 9)
+                    for issue in config_analysis["high_risk"]:
+                        pdf.multi_cell(
+                            0, 5, f"• {issue}", new_x=XPos.LMARGIN, new_y=YPos.NEXT
+                        )
+
                 if medium_count > 0:
                     pdf.ln(3)
-                    pdf.set_font('helvetica', 'B', 10)
-                    pdf.cell(0, 7, 'Medium-Risk Issues:', new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-                    pdf.set_font('helvetica', '', 9)
-                    for issue in config_analysis['medium_risk']:
-                        pdf.multi_cell(0, 5, f"• {issue}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-                
+                    pdf.set_font("helvetica", "B", 10)
+                    pdf.cell(
+                        0, 7, "Medium-Risk Issues:", new_x=XPos.LMARGIN, new_y=YPos.NEXT
+                    )
+                    pdf.set_font("helvetica", "", 9)
+                    for issue in config_analysis["medium_risk"]:
+                        pdf.multi_cell(
+                            0, 5, f"• {issue}", new_x=XPos.LMARGIN, new_y=YPos.NEXT
+                        )
+
                 if low_count > 0:
                     pdf.ln(3)
-                    pdf.set_font('helvetica', 'B', 10)
-                    pdf.cell(0, 7, 'Low-Risk Issues:', new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-                    pdf.set_font('helvetica', '', 9)
-                    for issue in config_analysis['low_risk']:
-                        pdf.multi_cell(0, 5, f"• {issue}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-                
+                    pdf.set_font("helvetica", "B", 10)
+                    pdf.cell(
+                        0, 7, "Low-Risk Issues:", new_x=XPos.LMARGIN, new_y=YPos.NEXT
+                    )
+                    pdf.set_font("helvetica", "", 9)
+                    for issue in config_analysis["low_risk"]:
+                        pdf.multi_cell(
+                            0, 5, f"• {issue}", new_x=XPos.LMARGIN, new_y=YPos.NEXT
+                        )
+
                 pdf.ln(5)
-            
+
             # Add Dockerfile scan results (only if not skipped)
-            if not results['dockerfile_scan'].get('skipped', False):
-                pdf.add_section_header('Dockerfile Scan Results')
-                
-                if results['dockerfile_scan']['success']:
-                    pdf.set_font('helvetica', '', 10)
-                    pdf.cell(0, 7, 'No Dockerfile linting issues found.', new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            if not results["dockerfile_scan"].get("skipped", False):
+                pdf.add_section_header("Dockerfile Scan Results")
+
+                if results["dockerfile_scan"]["success"]:
+                    pdf.set_font("helvetica", "", 10)
+                    pdf.cell(
+                        0,
+                        7,
+                        "No Dockerfile linting issues found.",
+                        new_x=XPos.LMARGIN,
+                        new_y=YPos.NEXT,
+                    )
                 else:
-                    pdf.set_font('helvetica', '', 10)
-                    pdf.cell(0, 7, 'Dockerfile linting issues:', new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                    pdf.set_font("helvetica", "", 10)
+                    pdf.cell(
+                        0,
+                        7,
+                        "Dockerfile linting issues:",
+                        new_x=XPos.LMARGIN,
+                        new_y=YPos.NEXT,
+                    )
                     pdf.ln(2)
-                    pdf.set_font('courier', '', 8)
-                    
-                    if results['dockerfile_scan']['output']:
-                        for line in results['dockerfile_scan']['output'].split('\n')[:20]:  # Limit lines
-                            pdf.multi_cell(0, 5, line, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-                
+                    pdf.set_font("courier", "", 8)
+
+                    if results["dockerfile_scan"]["output"]:
+                        for line in results["dockerfile_scan"]["output"].split("\n")[
+                            :20
+                        ]:  # Limit lines
+                            pdf.multi_cell(
+                                0, 5, line, new_x=XPos.LMARGIN, new_y=YPos.NEXT
+                            )
+
                 pdf.ln(5)
-            
+
             # Add vulnerability scan summary (rest remains the same)
-            pdf.add_section_header('Vulnerability Scan Summary')
-            vulnerabilities = results.get('json_data', [])
-            
+            pdf.add_section_header("Vulnerability Scan Summary")
+            vulnerabilities = results.get("json_data", [])
+
             if not vulnerabilities:
-                pdf.set_font('helvetica', '', 10)
-                pdf.cell(0, 7, 'No vulnerabilities found.', new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                pdf.set_font("helvetica", "", 10)
+                pdf.cell(
+                    0,
+                    7,
+                    "No vulnerabilities found.",
+                    new_x=XPos.LMARGIN,
+                    new_y=YPos.NEXT,
+                )
             else:
                 # Count vulnerabilities by severity
                 severity_counts: Dict[str, int] = {}
                 for vuln in vulnerabilities:
-                    severity = vuln.get('Severity', Severity.UNKNOWN)
+                    severity = vuln.get("Severity", Severity.UNKNOWN)
                     severity_counts[severity] = severity_counts.get(severity, 0) + 1
-                
-                pdf.set_font('helvetica', '', 10)
-                pdf.cell(0, 7, f'Total vulnerabilities: {len(vulnerabilities)}', new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-                
+
+                pdf.set_font("helvetica", "", 10)
+                pdf.cell(
+                    0,
+                    7,
+                    f"Total vulnerabilities: {len(vulnerabilities)}",
+                    new_x=XPos.LMARGIN,
+                    new_y=YPos.NEXT,
+                )
+
                 for severity, count in severity_counts.items():
-                    pdf.cell(0, 7, f'{severity}: {count}', new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-                
+                    pdf.cell(
+                        0,
+                        7,
+                        f"{severity}: {count}",
+                        new_x=XPos.LMARGIN,
+                        new_y=YPos.NEXT,
+                    )
+
                 pdf.ln(5)
-                
+
                 # Add limited vulnerability details table
                 if len(vulnerabilities) > 0:
-                    pdf.add_section_header('Top Vulnerabilities')
-                    
+                    pdf.add_section_header("Top Vulnerabilities")
+
                     # Show top 20 vulnerabilities
                     for i, vuln in enumerate(vulnerabilities[:20]):
                         if pdf.get_y() > pdf.h - 40:  # Check if near bottom
                             pdf.add_page()
-                        
-                        pdf.set_font('helvetica', 'B', 9)
-                        pdf.cell(0, 6, f"{i+1}. {vuln.get('VulnerabilityID', 'N/A')} ({vuln.get('Severity', 'N/A')})", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-                        
-                        pdf.set_font('helvetica', '', 8)
-                        pdf.multi_cell(0, 4, f"Package: {vuln.get('PkgName', 'N/A')} ({vuln.get('InstalledVersion', 'N/A')})", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-                        
-                        title = vuln.get('Title', '')
+
+                        pdf.set_font("helvetica", "B", 9)
+                        pdf.cell(
+                            0,
+                            6,
+                            f"{i+1}. {vuln.get('VulnerabilityID', 'N/A')} ({vuln.get('Severity', 'N/A')})",
+                            new_x=XPos.LMARGIN,
+                            new_y=YPos.NEXT,
+                        )
+
+                        pdf.set_font("helvetica", "", 8)
+                        pdf.multi_cell(
+                            0,
+                            4,
+                            f"Package: {vuln.get('PkgName', 'N/A')} ({vuln.get('InstalledVersion', 'N/A')})",
+                            new_x=XPos.LMARGIN,
+                            new_y=YPos.NEXT,
+                        )
+
+                        title = vuln.get("Title", "")
                         if title:
-                            pdf.multi_cell(0, 4, f"Title: {title[:100]}{'...' if len(title) > 100 else ''}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-                        
+                            pdf.multi_cell(
+                                0,
+                                4,
+                                f"Title: {title[:100]}{'...' if len(title) > 100 else ''}",
+                                new_x=XPos.LMARGIN,
+                                new_y=YPos.NEXT,
+                            )
+
                         pdf.ln(2)
-                    
+
                     if len(vulnerabilities) > 20:
                         pdf.ln(3)
-                        pdf.set_font('helvetica', 'I', 9)
-                        pdf.cell(0, 5, f'Showing 20 of {len(vulnerabilities)} vulnerabilities. See CSV/JSON for complete list.', new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-            
+                        pdf.set_font("helvetica", "I", 9)
+                        pdf.cell(
+                            0,
+                            5,
+                            f"Showing 20 of {len(vulnerabilities)} vulnerabilities. See CSV/JSON for complete list.",
+                            new_x=XPos.LMARGIN,
+                            new_y=YPos.NEXT,
+                        )
+
             # Save the PDF
             pdf.output(output_file)
             return output_file
-            
+
         except Exception as e:
             logger.error(f"Error saving results to PDF file: {e}")
             return ""
-        
+
     def generate_all_reports(self, results: Dict) -> Dict:
         """
         Generate all report formats (JSON, CSV, PDF, HTML) from scan results.
-        
+
         Args:
             results: The scan results to save
-            
+
         Returns:
             Dictionary with paths to the generated reports
         """
         from docksec.report_generator import ReportGenerator
-        
+
         # Calculate security score if not already set
         if self.analysis_score is None:
             self.analysis_score = self.get_security_score(results)
-        
+
         # Initialize report generator
-        generator = ReportGenerator(self.image_name or "docksec_report", self.RESULTS_DIR)
+        generator = ReportGenerator(
+            self.image_name or "docksec_report", self.RESULTS_DIR
+        )
         generator.set_analysis_score(self.analysis_score)
-        
+
         # Generate all reports using the dedicated generator
         report_paths = generator.generate_all_reports(results)
-        
+
         return report_paths
-    
+
     def _calculate_local_score(self, results: Dict) -> float:
         """
         Calculate a security score locally without any LLM call.
@@ -1361,9 +1589,10 @@ class DockerSecurityScanner:
         Weights: vulnerabilities 50%, dockerfile quality 30%, configuration 20%.
         """
         from docksec.score_calculator import SecurityScoreCalculator
+
         calculator = SecurityScoreCalculator(skip_llm=True)
         breakdown = calculator.get_score_breakdown(results)
-        score = breakdown['overall']
+        score = breakdown["overall"]
 
         print(f"Security Score: {score}/100")
         if score >= 90:
@@ -1383,7 +1612,7 @@ class DockerSecurityScanner:
 
         Uses LLM-based scoring when available. Falls back to local static
         scoring when scan_only=True or if the LLM call fails (e.g., quota exceeded).
-        
+
         Optimizes token usage by sending summarized vulnerability data to LLM.
 
         Args:
@@ -1397,11 +1626,11 @@ class DockerSecurityScanner:
 
         try:
             from docksec.config import summarize_vulnerabilities
-            
+
             # Create summarized vulnerability data instead of sending full results
-            vulnerabilities = results.get('json_data', [])
+            vulnerabilities = results.get("json_data", [])
             vuln_summary = summarize_vulnerabilities(vulnerabilities, max_count=20)
-            
+
             # Send only summary, not full results dict
             score = self.score_chain.invoke({"results": vuln_summary})
             print(f"Security Score: {score.score}")
@@ -1410,39 +1639,41 @@ class DockerSecurityScanner:
             logger.warning(f"AI scoring failed: {e}. Falling back to local scoring.")
             print(f"AI scoring unavailable: {e}. Falling back to local scoring.")
             return self._calculate_local_score(results)
-    
+
     def save_results_to_html(self, results: Dict) -> str:
         """
         Save scan results to an HTML file using a template.
-        
+
         Args:
             results: The scan results to save
-            
+
         Returns:
             Path to the saved HTML file
         """
         # Sanitize image name for filename
         image_name_for_file = self.image_name or "docksec_report"
-        safe_image_name = re.sub(r'[:/.\-]', '_', image_name_for_file)
-        output_file = os.path.join(self.RESULTS_DIR, f"{safe_image_name}_security_report.html")
+        safe_image_name = re.sub(r"[:/.\-]", "_", image_name_for_file)
+        output_file = os.path.join(
+            self.RESULTS_DIR, f"{safe_image_name}_security_report.html"
+        )
 
         try:
             from docksec.config import get_html_template
-            
+
             # Prepare template variables
             template_vars = self._prepare_html_template_vars(results)
-            
+
             # Replace placeholders in template
             html_content = get_html_template()
             for key, value in template_vars.items():
-                html_content = html_content.replace(f'{{{{{key}}}}}', str(value))
-            
+                html_content = html_content.replace(f"{{{{{key}}}}}", str(value))
+
             # Save the HTML file
-            with open(output_file, 'w', encoding='utf-8') as f:
+            with open(output_file, "w", encoding="utf-8") as f:
                 f.write(html_content)
-            
+
             return output_file
-            
+
         except Exception as e:
             logger.error(f"Error saving results to HTML file: {e}")
             return ""
@@ -1450,29 +1681,31 @@ class DockerSecurityScanner:
     def _prepare_html_template_vars(self, results: Dict) -> Dict[str, str]:
         """
         Prepare variables for HTML template replacement.
-        
+
         Args:
             results: The scan results
-            
+
         Returns:
             Dictionary of template variables
         """
-        vulnerabilities = results.get('json_data', [])
-        scan_mode = results.get('scan_mode', 'full')
-        
+        vulnerabilities = results.get("json_data", [])
+        scan_mode = results.get("scan_mode", "full")
+
         # Base template variables
         template_vars = {
-            'IMAGE_NAME': self.image_name or "N/A",
-            'SCAN_MODE': scan_mode.replace('_', ' ').title(),
-            'SCAN_MODE_TITLE': f"{scan_mode.replace('_', ' ').title()} Scan",
-            'DOCKERFILE_PATH': results.get('dockerfile_path', 'N/A'),
-            'SCAN_DATE': results.get('timestamp', ''),
-            'ANALYSIS_SCORE': self.analysis_score
+            "IMAGE_NAME": self.image_name or "N/A",
+            "SCAN_MODE": scan_mode.replace("_", " ").title(),
+            "SCAN_MODE_TITLE": f"{scan_mode.replace('_', ' ').title()} Scan",
+            "DOCKERFILE_PATH": results.get("dockerfile_path", "N/A"),
+            "SCAN_DATE": results.get("timestamp", ""),
+            "ANALYSIS_SCORE": self.analysis_score,
         }
-        
+
         # Security Score Section
-        if 'security_score' in results:
-            template_vars['SECURITY_SCORE_SECTION'] = f"""
+        if "security_score" in results:
+            template_vars[
+                "SECURITY_SCORE_SECTION"
+            ] = f"""
             <div class="section">
                 <h2>Security Score</h2>
                 <div class="score-container">
@@ -1482,14 +1715,20 @@ class DockerSecurityScanner:
             </div>
             """
         else:
-            template_vars['SECURITY_SCORE_SECTION'] = ""
-        
+            template_vars["SECURITY_SCORE_SECTION"] = ""
+
         # Image Information Section
-        if 'image_info' in results:
-            image_info = results['image_info']
-            size_mb = round(image_info.get('size', 0) / (1024*1024), 2) if image_info.get('size') else 'N/A'
-            
-            template_vars['IMAGE_INFO_SECTION'] = f"""
+        if "image_info" in results:
+            image_info = results["image_info"]
+            size_mb = (
+                round(image_info.get("size", 0) / (1024 * 1024), 2)
+                if image_info.get("size")
+                else "N/A"
+            )
+
+            template_vars[
+                "IMAGE_INFO_SECTION"
+            ] = f"""
             <div class="section">
                 <h2>Image Information</h2>
                 <div class="info-grid">
@@ -1513,70 +1752,78 @@ class DockerSecurityScanner:
             </div>
             """
         else:
-            template_vars['IMAGE_INFO_SECTION'] = ""
-        
+            template_vars["IMAGE_INFO_SECTION"] = ""
+
         # Configuration Analysis Section
-        if 'config_analysis' in results:
-            config_analysis = results['config_analysis']
+        if "config_analysis" in results:
+            config_analysis = results["config_analysis"]
             config_html = '<div class="section"><h2>Configuration Analysis</h2><div class="config-issues">'
-            
+
             # High risk issues
-            if config_analysis.get('high_risk'):
+            if config_analysis.get("high_risk"):
                 config_html += '<div class="config-category"><h4>High-Risk Issues</h4><ul class="config-list high">'
-                for issue in config_analysis['high_risk']:
-                    config_html += f'<li>{self._escape_html(issue)}</li>'
-                config_html += '</ul></div>'
-            
+                for issue in config_analysis["high_risk"]:
+                    config_html += f"<li>{self._escape_html(issue)}</li>"
+                config_html += "</ul></div>"
+
             # Medium risk issues
-            if config_analysis.get('medium_risk'):
+            if config_analysis.get("medium_risk"):
                 config_html += '<div class="config-category"><h4>Medium-Risk Issues</h4><ul class="config-list medium">'
-                for issue in config_analysis['medium_risk']:
-                    config_html += f'<li>{self._escape_html(issue)}</li>'
-                config_html += '</ul></div>'
-            
+                for issue in config_analysis["medium_risk"]:
+                    config_html += f"<li>{self._escape_html(issue)}</li>"
+                config_html += "</ul></div>"
+
             # Low risk issues
-            if config_analysis.get('low_risk'):
+            if config_analysis.get("low_risk"):
                 config_html += '<div class="config-category"><h4>Low-Risk Issues</h4><ul class="config-list low">'
-                for issue in config_analysis['low_risk']:
-                    config_html += f'<li>{self._escape_html(issue)}</li>'
-                config_html += '</ul></div>'
-            
-            config_html += '</div></div>'
-            template_vars['CONFIG_ANALYSIS_SECTION'] = config_html
+                for issue in config_analysis["low_risk"]:
+                    config_html += f"<li>{self._escape_html(issue)}</li>"
+                config_html += "</ul></div>"
+
+            config_html += "</div></div>"
+            template_vars["CONFIG_ANALYSIS_SECTION"] = config_html
         else:
-            template_vars['CONFIG_ANALYSIS_SECTION'] = ""
-        
+            template_vars["CONFIG_ANALYSIS_SECTION"] = ""
+
         # Dockerfile Section
-        if not results['dockerfile_scan'].get('skipped', False):
-            if results['dockerfile_scan']['success']:
-                dockerfile_content = '<div class="no-issues">No Dockerfile linting issues found</div>'
+        if not results["dockerfile_scan"].get("skipped", False):
+            if results["dockerfile_scan"]["success"]:
+                dockerfile_content = (
+                    '<div class="no-issues">No Dockerfile linting issues found</div>'
+                )
             else:
-                dockerfile_output = results['dockerfile_scan'].get('output', '')
+                dockerfile_output = results["dockerfile_scan"].get("output", "")
                 dockerfile_content = f'<pre style="background: #f8f9fa; padding: 15px; border-radius: 5px; overflow-x: auto; font-size: 0.9em;">{self._escape_html(dockerfile_output[:2000])}</pre>'
                 if len(dockerfile_output) > 2000:
-                    dockerfile_content += '<p><em>Output truncated for display...</em></p>'
-            
-            template_vars['DOCKERFILE_SECTION'] = f"""
+                    dockerfile_content += (
+                        "<p><em>Output truncated for display...</em></p>"
+                    )
+
+            template_vars[
+                "DOCKERFILE_SECTION"
+            ] = f"""
             <div class="section">
                 <h2>Dockerfile Scan Results</h2>
                 {dockerfile_content}
             </div>
             """
         else:
-            template_vars['DOCKERFILE_SECTION'] = ""
-        
+            template_vars["DOCKERFILE_SECTION"] = ""
+
         # Vulnerability Summary
         if not vulnerabilities:
-            template_vars['VULNERABILITY_SUMMARY'] = '<div class="no-issues">No vulnerabilities found</div>'
-            template_vars['DETAILED_VULNERABILITIES_SECTION'] = ""
+            template_vars["VULNERABILITY_SUMMARY"] = (
+                '<div class="no-issues">No vulnerabilities found</div>'
+            )
+            template_vars["DETAILED_VULNERABILITIES_SECTION"] = ""
         else:
             # Count vulnerabilities by severity
             severity_counts = {s: 0 for s in Severity.scored_levels()}
             for vuln in vulnerabilities:
-                severity = vuln.get('Severity', Severity.UNKNOWN)
+                severity = vuln.get("Severity", Severity.UNKNOWN)
                 if severity in severity_counts:
                     severity_counts[severity] += 1
-            
+
             # Create severity statistics HTML
             severity_html = f"""
             <div class="severity-stats">
@@ -1599,9 +1846,9 @@ class DockerSecurityScanner:
             </div>
             <p><strong>Total vulnerabilities:</strong> {len(vulnerabilities)}</p>
             """
-            
-            template_vars['VULNERABILITY_SUMMARY'] = severity_html
-            
+
+            template_vars["VULNERABILITY_SUMMARY"] = severity_html
+
             # Detailed vulnerabilities table
             if vulnerabilities:
                 table_html = """
@@ -1621,19 +1868,29 @@ class DockerSecurityScanner:
                         </thead>
                         <tbody>
                 """
-                
+
                 # Show top 50 vulnerabilities to avoid overly large HTML files
                 for vuln in vulnerabilities[:50]:
-                    severity = vuln.get('Severity', 'UNKNOWN').lower()
-                    severity_class = f'badge-{severity}' if severity in ['critical', 'high', 'medium', 'low'] else 'badge-low'
-                    
-                    status = vuln.get('Status', 'affected')
-                    status_class = 'status-fixed' if status == 'fixed' else 'status-affected'
-                    
-                    cvss_score = vuln.get('CVSS', 'N/A')
-                    if cvss_score and cvss_score != 'N/A':
-                        cvss_score = f"{cvss_score:.1f}" if isinstance(cvss_score, (int, float)) else str(cvss_score)
-                    
+                    severity = vuln.get("Severity", "UNKNOWN").lower()
+                    severity_class = (
+                        f"badge-{severity}"
+                        if severity in ["critical", "high", "medium", "low"]
+                        else "badge-low"
+                    )
+
+                    status = vuln.get("Status", "affected")
+                    status_class = (
+                        "status-fixed" if status == "fixed" else "status-affected"
+                    )
+
+                    cvss_score = vuln.get("CVSS", "N/A")
+                    if cvss_score and cvss_score != "N/A":
+                        cvss_score = (
+                            f"{cvss_score:.1f}"
+                            if isinstance(cvss_score, (int, float))
+                            else str(cvss_score)
+                        )
+
                     table_html += f"""
                             <tr>
                                 <td><strong>{self._escape_html(vuln.get('VulnerabilityID', 'N/A'))}</strong></td>
@@ -1645,59 +1902,65 @@ class DockerSecurityScanner:
                                 <td><span class="status-badge {status_class}">{status}</span></td>
                             </tr>
                     """
-                
+
                 table_html += """
                         </tbody>
                     </table>
                 """
-                
+
                 if len(vulnerabilities) > 50:
                     table_html += f'<p style="margin-top: 15px; font-style: italic; color: #666;">Showing 50 of {len(vulnerabilities)} vulnerabilities. See CSV/JSON for complete list.</p>'
-                
-                table_html += '</div>'
-                template_vars['DETAILED_VULNERABILITIES_SECTION'] = table_html
+
+                table_html += "</div>"
+                template_vars["DETAILED_VULNERABILITIES_SECTION"] = table_html
             else:
-                template_vars['DETAILED_VULNERABILITIES_SECTION'] = ""
-        
+                template_vars["DETAILED_VULNERABILITIES_SECTION"] = ""
+
         return template_vars
 
     def _escape_html(self, text: str) -> str:
         """
         Escape HTML special characters in text.
-        
+
         Uses Python's built-in html.escape() for complete HTML5
         entity handling, replacing the previous hand-rolled table.
-        
+
         Args:
             text: Text to escape
-            
+
         Returns:
             HTML-escaped text
         """
         import html
+
         if not text:
             return ""
         return html.escape(str(text), quote=True)
 
+
 def main():
     """Main function to run the security scanner."""
     if len(sys.argv) < 3:
-        print("Usage: python docker_scanner.py <dockerfile_path> <image_name> [severity] [output_file]")
-        print("Example: python docker_scanner.py ./Dockerfile myapp:latest CRITICAL,HIGH results.json")
+        print(
+            "Usage: python docker_scanner.py <dockerfile_path> <image_name> [severity] [output_file]"
+        )
+        print(
+            "Example: python docker_scanner.py ./Dockerfile myapp:latest CRITICAL,HIGH results.json"
+        )
         sys.exit(1)
 
     dockerfile_path = sys.argv[1]
     image_name = sys.argv[2]
     severity = sys.argv[3] if len(sys.argv) > 3 else "CRITICAL,HIGH"
     # output_file = sys.argv[4] if len(sys.argv) > 4 else "results/scan_results.json"
-    
+
     try:
         # Initialize scanner with verification
         scanner = DockerSecurityScanner(dockerfile_path, image_name)
-        
+
         # Run full scan
         results = scanner.run_full_scan(severity)
-        
+
         # Calculate security score
         score = scanner.get_security_score(results)
         print_section("Security Score", [f"Score: {score}"], "yellow")
@@ -1706,20 +1969,21 @@ def main():
         scanner.generate_all_reports(results)
 
         print("\n=== Doing Advanced Scan ===")
-        
+
         # Run advanced scan
         scanner.advanced_scan()
 
         print("\n=== Finished Scanning ===")
         # Exit with appropriate code
-        if results['dockerfile_scan']['success'] and results['image_scan']['success']:
+        if results["dockerfile_scan"]["success"] and results["image_scan"]["success"]:
             sys.exit(0)
         else:
             sys.exit(1)
-            
+
     except ValueError as e:
         print(f"Error: {e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

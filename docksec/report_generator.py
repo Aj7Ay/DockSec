@@ -55,8 +55,10 @@ class ReportGenerator:
             os.makedirs(self.results_dir, exist_ok=True)
         except Exception as e:
             logger.error(f"Failed to create results directory {self.results_dir}: {e}")
-            
-        logger.info(f"ReportGenerator initialized. Reports will be saved to: {self.results_dir}")
+
+        logger.info(
+            f"ReportGenerator initialized. Reports will be saved to: {self.results_dir}"
+        )
 
     def set_analysis_score(self, score: float) -> None:
         """
@@ -111,7 +113,7 @@ class ReportGenerator:
             "severity_counts": self._count_by_severity(json_results),
             "scanner_coverage": coverage,
         }
-        
+
         # Add AI findings if available
         if "ai_findings" in results:
             report_data["ai_analysis"] = results["ai_findings"]
@@ -206,6 +208,7 @@ class ReportGenerator:
 
         try:
             from fpdf.enums import XPos, YPos
+
             # Create custom PDF class with text wrapping
             class PDF(FPDF):
                 def __init__(self):
@@ -254,50 +257,78 @@ class ReportGenerator:
             if "ai_findings" in results:
                 ai_findings = results["ai_findings"]
                 pdf.add_section_header("AI Dockerfile Analysis")
-                
+
                 # Vulnerabilities
                 if ai_findings.get("vulnerabilities"):
                     pdf.set_font("helvetica", "B", 10)
-                    pdf.cell(0, 7, "Vulnerabilities:", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                    pdf.cell(
+                        0, 7, "Vulnerabilities:", new_x=XPos.LMARGIN, new_y=YPos.NEXT
+                    )
                     pdf.set_font("helvetica", "", 9)
                     for i, vuln in enumerate(ai_findings["vulnerabilities"], 1):
-                        pdf.multi_cell(0, 5, f"{i}. {vuln}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                        pdf.multi_cell(
+                            0, 5, f"{i}. {vuln}", new_x=XPos.LMARGIN, new_y=YPos.NEXT
+                        )
                     pdf.ln(2)
-                
+
                 # Best Practices
                 if ai_findings.get("best_practices"):
                     pdf.set_font("helvetica", "B", 10)
-                    pdf.cell(0, 7, "Best Practices:", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                    pdf.cell(
+                        0, 7, "Best Practices:", new_x=XPos.LMARGIN, new_y=YPos.NEXT
+                    )
                     pdf.set_font("helvetica", "", 9)
                     for i, practice in enumerate(ai_findings["best_practices"], 1):
-                        pdf.multi_cell(0, 5, f"{i}. {practice}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                        pdf.multi_cell(
+                            0,
+                            5,
+                            f"{i}. {practice}",
+                            new_x=XPos.LMARGIN,
+                            new_y=YPos.NEXT,
+                        )
                     pdf.ln(2)
-                
+
                 # Security Risks
                 if ai_findings.get("security_risks"):
                     pdf.set_font("helvetica", "B", 10)
-                    pdf.cell(0, 7, "Security Risks:", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                    pdf.cell(
+                        0, 7, "Security Risks:", new_x=XPos.LMARGIN, new_y=YPos.NEXT
+                    )
                     pdf.set_font("helvetica", "", 9)
                     for i, risk in enumerate(ai_findings["security_risks"], 1):
-                        pdf.multi_cell(0, 5, f"{i}. {risk}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                        pdf.multi_cell(
+                            0, 5, f"{i}. {risk}", new_x=XPos.LMARGIN, new_y=YPos.NEXT
+                        )
                     pdf.ln(2)
-                
+
                 # Exposed Credentials
                 if ai_findings.get("exposed_credentials"):
                     pdf.set_font("helvetica", "B", 10)
-                    pdf.cell(0, 7, "Exposed Credentials:", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                    pdf.cell(
+                        0,
+                        7,
+                        "Exposed Credentials:",
+                        new_x=XPos.LMARGIN,
+                        new_y=YPos.NEXT,
+                    )
                     pdf.set_font("helvetica", "", 9)
                     for i, cred in enumerate(ai_findings["exposed_credentials"], 1):
-                        pdf.multi_cell(0, 5, f"{i}. {cred}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                        pdf.multi_cell(
+                            0, 5, f"{i}. {cred}", new_x=XPos.LMARGIN, new_y=YPos.NEXT
+                        )
                     pdf.ln(2)
-                
+
                 # Remediation Steps
                 if ai_findings.get("remediation"):
                     pdf.set_font("helvetica", "B", 10)
-                    pdf.cell(0, 7, "Remediation Steps:", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                    pdf.cell(
+                        0, 7, "Remediation Steps:", new_x=XPos.LMARGIN, new_y=YPos.NEXT
+                    )
                     pdf.set_font("helvetica", "", 9)
                     for i, step in enumerate(ai_findings["remediation"], 1):
-                        pdf.multi_cell(0, 5, f"{i}. {step}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                        pdf.multi_cell(
+                            0, 5, f"{i}. {step}", new_x=XPos.LMARGIN, new_y=YPos.NEXT
+                        )
                     pdf.ln(5)
 
             # Image Information (if available)
@@ -313,7 +344,9 @@ class ReportGenerator:
                     pdf.multi_cell_with_title("Created:", image_info["created"][:19])
 
                 if image_info.get("architecture"):
-                    pdf.multi_cell_with_title("Architecture:", image_info["architecture"])
+                    pdf.multi_cell_with_title(
+                        "Architecture:", image_info["architecture"]
+                    )
 
                 if image_info.get("os"):
                     pdf.multi_cell_with_title("OS:", image_info["os"])
@@ -343,26 +376,38 @@ class ReportGenerator:
                 if high_count > 0:
                     pdf.ln(3)
                     pdf.set_font("helvetica", "B", 10)
-                    pdf.cell(0, 7, "High-Risk Issues:", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                    pdf.cell(
+                        0, 7, "High-Risk Issues:", new_x=XPos.LMARGIN, new_y=YPos.NEXT
+                    )
                     pdf.set_font("helvetica", "", 9)
                     for issue in config_analysis["high_risk"]:
-                        pdf.multi_cell(0, 5, f"• {issue}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                        pdf.multi_cell(
+                            0, 5, f"• {issue}", new_x=XPos.LMARGIN, new_y=YPos.NEXT
+                        )
 
                 if medium_count > 0:
                     pdf.ln(3)
                     pdf.set_font("helvetica", "B", 10)
-                    pdf.cell(0, 7, "Medium-Risk Issues:", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                    pdf.cell(
+                        0, 7, "Medium-Risk Issues:", new_x=XPos.LMARGIN, new_y=YPos.NEXT
+                    )
                     pdf.set_font("helvetica", "", 9)
                     for issue in config_analysis["medium_risk"]:
-                        pdf.multi_cell(0, 5, f"• {issue}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                        pdf.multi_cell(
+                            0, 5, f"• {issue}", new_x=XPos.LMARGIN, new_y=YPos.NEXT
+                        )
 
                 if low_count > 0:
                     pdf.ln(3)
                     pdf.set_font("helvetica", "B", 10)
-                    pdf.cell(0, 7, "Low-Risk Issues:", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                    pdf.cell(
+                        0, 7, "Low-Risk Issues:", new_x=XPos.LMARGIN, new_y=YPos.NEXT
+                    )
                     pdf.set_font("helvetica", "", 9)
                     for issue in config_analysis["low_risk"]:
-                        pdf.multi_cell(0, 5, f"• {issue}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                        pdf.multi_cell(
+                            0, 5, f"• {issue}", new_x=XPos.LMARGIN, new_y=YPos.NEXT
+                        )
 
                 pdf.ln(5)
 
@@ -372,10 +417,22 @@ class ReportGenerator:
 
                 if results["dockerfile_scan"]["success"]:
                     pdf.set_font("helvetica", "", 10)
-                    pdf.cell(0, 7, "No Dockerfile linting issues found.", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                    pdf.cell(
+                        0,
+                        7,
+                        "No Dockerfile linting issues found.",
+                        new_x=XPos.LMARGIN,
+                        new_y=YPos.NEXT,
+                    )
                 else:
                     pdf.set_font("helvetica", "", 10)
-                    pdf.cell(0, 7, "Dockerfile linting issues:", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                    pdf.cell(
+                        0,
+                        7,
+                        "Dockerfile linting issues:",
+                        new_x=XPos.LMARGIN,
+                        new_y=YPos.NEXT,
+                    )
                     pdf.ln(2)
                     pdf.set_font("courier", "", 8)
 
@@ -383,7 +440,9 @@ class ReportGenerator:
                         for line in results["dockerfile_scan"]["output"].split("\n")[
                             :20
                         ]:
-                            pdf.multi_cell(0, 5, line, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                            pdf.multi_cell(
+                                0, 5, line, new_x=XPos.LMARGIN, new_y=YPos.NEXT
+                            )
 
                 pdf.ln(5)
 
@@ -393,15 +452,33 @@ class ReportGenerator:
 
             if not vulnerabilities:
                 pdf.set_font("helvetica", "", 10)
-                pdf.cell(0, 7, "No vulnerabilities found.", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                pdf.cell(
+                    0,
+                    7,
+                    "No vulnerabilities found.",
+                    new_x=XPos.LMARGIN,
+                    new_y=YPos.NEXT,
+                )
             else:
                 severity_counts = self._count_by_severity(vulnerabilities)
 
                 pdf.set_font("helvetica", "", 10)
-                pdf.cell(0, 7, f"Total vulnerabilities: {len(vulnerabilities)}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                pdf.cell(
+                    0,
+                    7,
+                    f"Total vulnerabilities: {len(vulnerabilities)}",
+                    new_x=XPos.LMARGIN,
+                    new_y=YPos.NEXT,
+                )
 
                 for severity, count in severity_counts.items():
-                    pdf.cell(0, 7, f"{severity}: {count}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                    pdf.cell(
+                        0,
+                        7,
+                        f"{severity}: {count}",
+                        new_x=XPos.LMARGIN,
+                        new_y=YPos.NEXT,
+                    )
 
                 pdf.ln(5)
 
@@ -523,7 +600,9 @@ class ReportGenerator:
         }
 
         # Security Score Section
-        template_vars["SECURITY_SCORE_SECTION"] = f"""
+        template_vars[
+            "SECURITY_SCORE_SECTION"
+        ] = f"""
         <div class="section">
             <h2>Security Score</h2>
             <div class="score-container">
@@ -542,7 +621,9 @@ class ReportGenerator:
                 else "N/A"
             )
 
-            template_vars["IMAGE_INFO_SECTION"] = f"""
+            template_vars[
+                "IMAGE_INFO_SECTION"
+            ] = f"""
             <div class="section">
                 <h2>Image Information</h2>
                 <div class="info-grid">
@@ -571,9 +652,7 @@ class ReportGenerator:
         # Configuration Analysis Section
         if "config_analysis" in results:
             config_analysis = results["config_analysis"]
-            config_html = (
-                '<div class="section"><h2>Configuration Analysis</h2><div class="config-issues">'
-            )
+            config_html = '<div class="section"><h2>Configuration Analysis</h2><div class="config-issues">'
 
             # High risk issues
             if config_analysis.get("high_risk"):
@@ -615,7 +694,9 @@ class ReportGenerator:
                         "<p><em>Output truncated for display...</em></p>"
                     )
 
-            template_vars["DOCKERFILE_SECTION"] = f"""
+            template_vars[
+                "DOCKERFILE_SECTION"
+            ] = f"""
             <div class="section">
                 <h2>Dockerfile Scan Results</h2>
                 {dockerfile_content}
@@ -659,8 +740,8 @@ class ReportGenerator:
             template_vars["VULNERABILITY_SUMMARY"] = severity_html
 
             # Scanner Coverage Section
-            template_vars["SCANNER_COVERAGE_SECTION"] = self._build_scanner_coverage_html(
-                vulnerabilities
+            template_vars["SCANNER_COVERAGE_SECTION"] = (
+                self._build_scanner_coverage_html(vulnerabilities)
             )
 
             # Detailed vulnerabilities table — includes Scanner column
@@ -797,7 +878,9 @@ class ReportGenerator:
             "trivy_only": trivy_only,
             "grype_only": grype_only,
             "confirmed_by_both": both,
-            "scanners_used": sorted(list(scanners_seen)) if scanners_seen else ["trivy"],
+            "scanners_used": (
+                sorted(list(scanners_seen)) if scanners_seen else ["trivy"]
+            ),
         }
 
     def _build_scanner_coverage_html(self, vulnerabilities: List[Dict]) -> str:
